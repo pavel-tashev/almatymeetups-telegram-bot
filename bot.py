@@ -60,7 +60,9 @@ class TelegramBot:
         )
 
         # Group join handler (separate from conversation)
-        join_handler = MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, self.handle_new_member)
+        join_handler = MessageHandler(
+            filters.StatusUpdate.NEW_CHAT_MEMBERS, self.handle_new_member
+        )
 
         # Admin approval handlers
         approve_handler = CallbackQueryHandler(
@@ -141,20 +143,48 @@ class TelegramBot:
                 )
                 continue
 
+            # Send message to user in private chat
+            await self.send_join_request_to_user(update, context, member)
+
+    async def send_join_request_to_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE, member):
+        """Send join request message to user in private chat"""
+        try:
             # Create join request button
             keyboard = [
-                [InlineKeyboardButton("Join Our Community", callback_data="join_group")]
+                [InlineKeyboardButton("Start Application Process", callback_data="join_group")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             welcome_text = (
                 f"Hello {member.first_name}! 👋\n\n"
-                "Welcome to our community! To join our group, please click the button below "
-                "and complete a short application form.\n\n"
+                "Thank you for your interest in joining our community!\n\n"
+                "To complete your membership, you need to go through our approval process. "
+                "Please click the button below to start the application.\n\n"
                 "We'll review your application and get back to you soon!"
             )
 
-            await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+            # Send message to user in private chat
+            await context.bot.send_message(
+                chat_id=member.id,
+                text=welcome_text,
+                reply_markup=reply_markup
+            )
+            
+            # Remove user from group immediately
+            try:
+                await context.bot.ban_chat_member(
+                    chat_id=update.effective_chat.id,
+                    user_id=member.id
+                )
+                await context.bot.unban_chat_member(
+                    chat_id=update.effective_chat.id,
+                    user_id=member.id
+                )
+            except Exception as e:
+                logger.error(f"Failed to remove user from group: {e}")
+                
+        except Exception as e:
+            logger.error(f"Failed to send message to user {member.id}: {e}")
 
     async def start_application(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
