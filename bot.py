@@ -49,7 +49,7 @@ class TelegramBot:
         # Join request conversation
         join_conversation = ConversationHandler(
             entry_points=[
-                CallbackQueryHandler(self.start_application, pattern="^join_group$")
+                # No entry points needed - conversation starts from /start command
             ],
             states={
                 ANSWERING_QUESTIONS: [
@@ -59,9 +59,9 @@ class TelegramBot:
             fallbacks=[CommandHandler("cancel", self.cancel_application)],
         )
 
-        # Group join handler (separate from conversation)
-        join_handler = MessageHandler(
-            filters.StatusUpdate.NEW_CHAT_MEMBERS, self.handle_new_member
+        # Chat join request handler (for invite links)
+        join_request_handler = MessageHandler(
+            filters.StatusUpdate.CHAT_JOIN_REQUEST, self.handle_chat_join_request
         )
 
         # Admin approval handlers
@@ -74,7 +74,7 @@ class TelegramBot:
 
         # Add handlers
         self.application.add_handler(start_handler)
-        self.application.add_handler(join_handler)
+        self.application.add_handler(join_request_handler)
         self.application.add_handler(join_conversation)
         self.application.add_handler(approve_handler)
         self.application.add_handler(decline_handler)
@@ -101,99 +101,46 @@ class TelegramBot:
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
         user = update.effective_user
+        args = context.args
+        
+        logger.info(f"Start command received from user {user.id} ({user.first_name}) with args: {args}")
 
-        # Check if user already has a pending request
-        existing_request = db.get_request(user.id)
-        if existing_request and existing_request["status"] == "pending":
-            await update.message.reply_text(
-                "You already have a pending request. Please wait for admin approval."
-            )
+        # Check if this is a verification deep-link
+        if args and args[0].startswith("verify_"):
+            user_id_from_link = int(args[0].split("_")[1])
+            logger.info(f"Verification deep-link for user {user_id_from_link}")
+            
+            # Verify the user ID matches
+            if user.id != user_id_from_link:
+                logger.warning(f"User ID mismatch: {user.id} vs {user_id_from_link}")
+                await update.message.reply_text(
+                    "❌ This verification link is not for your account. Please use the correct link."
+                )
+                return
+            
+            # Check if user already has a pending request
+            existing_request = db.get_request(user.id)
+            if existing_request and existing_request["status"] == "pending":
+                logger.info(f"User {user.id} already has pending request")
+                await update.message.reply_text(
+                    "You already have a pending request. Please wait for admin approval."
+                )
+                return
+
+            # Start the application process directly
+            await self.start_verification_process(update, context)
             return
 
-        # Create join request button
-        keyboard = [
-            [InlineKeyboardButton("Join Our Community", callback_data="join_group")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        welcome_text = (
+        # Regular /start command (fallback)
+        await update.message.reply_text(
             f"Hello {user.first_name}! 👋\n\n"
-            "Welcome to our community! To join our group, please click the button below "
-            "and complete a short application form.\n\n"
-            "We'll review your application and get back to you soon!"
+            "Welcome! To join our community, please use the invite link and follow the verification process."
         )
 
-        await update.message.reply_text(welcome_text, reply_markup=reply_markup)
-
-    async def handle_new_member(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        """Handle new members joining the group"""
-        logger.info(f"New member detected: {update.message.new_chat_members}")
-        for member in update.message.new_chat_members:
-            # Skip if the new member is the bot itself
-            if member.id == context.bot.id:
-                continue
-
-            # Check if user already has a pending request
-            existing_request = db.get_request(member.id)
-            if existing_request and existing_request["status"] == "pending":
-                await update.message.reply_text(
-                    f"Welcome {member.first_name}! You already have a pending request. Please wait for admin approval."
-                )
-                continue
-
-            # Send message to user in private chat
-            await self.send_join_request_to_user(update, context, member)
-
-    async def send_join_request_to_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE, member):
-        """Send join request message to user in private chat"""
-        try:
-            # Create join request button
-            keyboard = [
-                [InlineKeyboardButton("Start Application Process", callback_data="join_group")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            welcome_text = (
-                f"Hello {member.first_name}! 👋\n\n"
-                "Thank you for your interest in joining our community!\n\n"
-                "To complete your membership, you need to go through our approval process. "
-                "Please click the button below to start the application.\n\n"
-                "We'll review your application and get back to you soon!"
-            )
-
-            # Send message to user in private chat
-            await context.bot.send_message(
-                chat_id=member.id,
-                text=welcome_text,
-                reply_markup=reply_markup
-            )
-            
-            # Remove user from group immediately
-            try:
-                await context.bot.ban_chat_member(
-                    chat_id=update.effective_chat.id,
-                    user_id=member.id
-                )
-                await context.bot.unban_chat_member(
-                    chat_id=update.effective_chat.id,
-                    user_id=member.id
-                )
-            except Exception as e:
-                logger.error(f"Failed to remove user from group: {e}")
-                
-        except Exception as e:
-            logger.error(f"Failed to send message to user {member.id}: {e}")
-
-    async def start_application(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        """Start the application process"""
-        query = update.callback_query
-        await query.answer()
-
+    async def start_verification_process(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Start the verification process for a user who clicked the deep-link"""
         user = update.effective_user
+        logger.info(f"Starting verification process for user {user.id}")
 
         # Create or update request in database
         request_id = db.create_request(
@@ -202,6 +149,7 @@ class TelegramBot:
             first_name=user.first_name,
             last_name=user.last_name,
         )
+        logger.info(f"Created request {request_id} for user {user.id}")
 
         # Store request_id in context
         context.user_data["request_id"] = request_id
@@ -211,14 +159,64 @@ class TelegramBot:
         # Start with first question
         questions = get_all_questions()
         first_question = questions[0]
+        logger.info(f"Starting questions for user {user.id}, question 1 of {len(questions)}")
 
-        await query.edit_message_text(
+        await update.message.reply_text(
+            f"🔐 **Verification Process Started**\n\n"
             f"Great! Let's get to know you better. Please answer the following questions:\n\n"
             f"**Question 1 of {len(questions)}:**\n"
             f"{first_question['question']}"
         )
 
+        # Set conversation state
         return ANSWERING_QUESTIONS
+
+    async def handle_chat_join_request(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        """Handle chat join requests from invite links"""
+        join_request = update.chat_join_request
+        user = join_request.from_user
+        chat = join_request.chat
+        
+        logger.info(f"Chat join request received from user {user.id} ({user.first_name}) for chat {chat.id}")
+        
+        # Check if user already has a pending request
+        existing_request = db.get_request(user.id)
+        if existing_request and existing_request["status"] == "pending":
+            logger.info(f"User {user.id} already has pending request")
+            await context.bot.send_message(
+                chat_id=chat.id,
+                text=f"@{user.username or user.first_name} already has a pending request. Please wait for admin approval."
+            )
+            return
+
+        # Create deep-link button to start verification
+        deep_link = f"https://t.me/{context.bot.username}?start=verify_{user.id}"
+        keyboard = [
+            [InlineKeyboardButton("🔐 Start Verification", url=deep_link)]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        verification_text = (
+            f"👋 Hello @{user.username or user.first_name}!\n\n"
+            "Thank you for requesting to join our community!\n\n"
+            "To complete your membership, please click the button below to start the verification process.\n\n"
+            "⚠️ **Important:** You must complete the verification within 24 hours or your request will be automatically declined."
+        )
+
+        try:
+            logger.info(f"Posting verification message for user {user.id} in chat {chat.id}")
+            await context.bot.send_message(
+                chat_id=chat.id,
+                text=verification_text,
+                reply_markup=reply_markup
+            )
+            logger.info(f"Successfully posted verification message for user {user.id}")
+        except Exception as e:
+            logger.error(f"Failed to post verification message for user {user.id}: {e}")
+
+
 
     async def handle_answer(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle user's answer to a question"""
@@ -228,6 +226,8 @@ class TelegramBot:
         questions = get_all_questions()
         current_question_index = context.user_data["current_question"]
         current_question = questions[current_question_index]
+
+        logger.info(f"User {user.id} answered question {current_question_index + 1}: {current_question['id']}")
 
         # Store the answer
         context.user_data["answers"][current_question["id"]] = answer
@@ -239,6 +239,7 @@ class TelegramBot:
             # More questions to ask
             next_question = questions[next_question_index]
             context.user_data["current_question"] = next_question_index
+            logger.info(f"Moving to question {next_question_index + 1} for user {user.id}")
 
             await update.message.reply_text(
                 f"**Question {next_question_index + 1} of {len(questions)}:**\n"
@@ -246,6 +247,7 @@ class TelegramBot:
             )
         else:
             # All questions answered, submit to admins
+            logger.info(f"All questions answered for user {user.id}, submitting to admins")
             await self.submit_to_admins(update, context)
             return ConversationHandler.END
 
@@ -257,9 +259,12 @@ class TelegramBot:
         request_id = context.user_data["request_id"]
         answers = context.user_data["answers"]
 
+        logger.info(f"Submitting application for user {user.id} (request {request_id}) to admin chat")
+
         # Save all answers to database
         for question_id, answer in answers.items():
             db.add_response(request_id, question_id, answer)
+        logger.info(f"Saved {len(answers)} answers to database for request {request_id}")
 
         # Create admin message
         admin_text = f"🔔 **New Join Request**\n\n"
@@ -293,21 +298,25 @@ class TelegramBot:
 
         # Send to admin chat
         try:
+            logger.info(f"Sending admin message to chat {ADMIN_CHAT_ID}")
             admin_message = await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
                 text=admin_text,
                 reply_markup=reply_markup,
                 parse_mode="Markdown",
             )
+            logger.info(f"Successfully sent admin message {admin_message.message_id}")
 
             # Store admin message ID
             db.update_request_status(request_id, "pending", admin_message.message_id)
+            logger.info(f"Updated request {request_id} status to pending")
 
             await update.message.reply_text(
                 "✅ Your application has been submitted successfully!\n\n"
                 "Our admins will review your application and get back to you soon. "
                 "Please be patient while we process your request."
             )
+            logger.info(f"Sent confirmation message to user {user.id}")
 
         except TelegramError as e:
             logger.error(f"Failed to send message to admin chat: {e}")
@@ -322,30 +331,38 @@ class TelegramBot:
         await query.answer()
 
         request_id = int(query.data.split("_")[1])
+        logger.info(f"Admin approving request {request_id}")
+        
         request = db.get_request_by_id(request_id)
 
         if not request:
+            logger.error(f"Request {request_id} not found for approval")
             await query.edit_message_text("❌ Request not found.")
             return
 
         # Update request status
         db.update_request_status(request_id, "approved", query.message.message_id)
+        logger.info(f"Updated request {request_id} status to approved")
 
         # Delete the admin message and send approval notification
         try:
+            logger.info(f"Deleting admin message for request {request_id}")
             await query.delete_message()
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
                 text=f"✅ **{request['first_name']}** has been approved and added to the group!",
             )
+            logger.info(f"Sent approval notification to admin chat")
         except TelegramError as e:
             logger.error(f"Failed to delete admin message: {e}")
 
-        # Add user to group
+        # Approve the chat join request
         try:
-            await context.bot.add_chat_member(
+            logger.info(f"Approving chat join request for user {request['user_id']}")
+            await context.bot.approve_chat_join_request(
                 chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
             )
+            logger.info(f"Successfully approved chat join request for user {request['user_id']}")
 
             # Notify user
             await context.bot.send_message(
@@ -353,13 +370,14 @@ class TelegramBot:
                 text="🎉 Congratulations! Your application has been approved!\n\n"
                 "You have been added to our community. Welcome aboard!",
             )
+            logger.info(f"Sent approval notification to user {request['user_id']}")
 
         except TelegramError as e:
-            logger.error(f"Failed to add user to group: {e}")
+            logger.error(f"Failed to approve chat join request for user {request['user_id']}: {e}")
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
-                text=f"❌ Failed to add user {request['first_name']} to the group. "
-                "Please add them manually.",
+                text=f"❌ Failed to approve request for user {request['first_name']}. "
+                "Please approve manually.",
             )
 
     async def decline_request(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -368,35 +386,55 @@ class TelegramBot:
         await query.answer()
 
         request_id = int(query.data.split("_")[1])
+        logger.info(f"Admin declining request {request_id}")
+        
         request = db.get_request_by_id(request_id)
 
         if not request:
+            logger.error(f"Request {request_id} not found for decline")
             await query.edit_message_text("❌ Request not found.")
             return
 
         # Update request status
         db.update_request_status(request_id, "declined", query.message.message_id)
+        logger.info(f"Updated request {request_id} status to declined")
 
         # Delete the admin message and send decline notification
         try:
+            logger.info(f"Deleting admin message for request {request_id}")
             await query.delete_message()
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
                 text=f"❌ **{request['first_name']}**'s request has been declined.",
             )
+            logger.info(f"Sent decline notification to admin chat")
         except TelegramError as e:
             logger.error(f"Failed to delete admin message: {e}")
 
-        # Notify user
+        # Decline the chat join request
         try:
+            logger.info(f"Declining chat join request for user {request['user_id']}")
+            await context.bot.decline_chat_join_request(
+                chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
+            )
+            logger.info(f"Successfully declined chat join request for user {request['user_id']}")
+
+            # Notify user
             await context.bot.send_message(
                 chat_id=request["user_id"],
                 text="❌ Unfortunately, your application has been declined.\n\n"
                 "Thank you for your interest in our community. "
                 "You can try applying again in the future.",
             )
+            logger.info(f"Sent decline notification to user {request['user_id']}")
+
         except TelegramError as e:
-            logger.error(f"Failed to notify user of decline: {e}")
+            logger.error(f"Failed to decline chat join request for user {request['user_id']}: {e}")
+            await context.bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text=f"❌ Failed to decline request for user {request['first_name']}. "
+                "Please decline manually.",
+            )
 
     async def cancel_application(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
