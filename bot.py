@@ -46,11 +46,6 @@ class TelegramBot:
         # Start command
         start_handler = CommandHandler("start", self.start_command)
 
-        # Group join handler
-        join_handler = MessageHandler(
-            filters.StatusUpdate.NEW_CHAT_MEMBERS, self.handle_new_member
-        )
-
         # Join request conversation
         join_conversation = ConversationHandler(
             entry_points=[
@@ -63,6 +58,9 @@ class TelegramBot:
             },
             fallbacks=[CommandHandler("cancel", self.cancel_application)],
         )
+
+        # Group join handler (separate from conversation)
+        join_handler = MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, self.handle_new_member)
 
         # Admin approval handlers
         approve_handler = CallbackQueryHandler(
