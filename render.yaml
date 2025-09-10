@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: almatymeetups-telegram-bot
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_CHAT_ID
+        sync: false
+      - key: TARGET_GROUP_ID
+        sync: false
+      - key: REQUEST_TIMEOUT_HOURS
+        value: 24
+      - key: DATABASE_URL
+        value: sqlite:///data/bot_database.db
