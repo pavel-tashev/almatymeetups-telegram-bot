@@ -46,6 +46,9 @@ class TelegramBot:
         # Start command
         start_handler = CommandHandler("start", self.start_command)
 
+        # Group join handler
+        join_handler = MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, self.handle_new_member)
+
         # Join request conversation
         join_conversation = ConversationHandler(
             entry_points=[
@@ -69,6 +72,7 @@ class TelegramBot:
 
         # Add handlers
         self.application.add_handler(start_handler)
+        self.application.add_handler(join_handler)
         self.application.add_handler(join_conversation)
         self.application.add_handler(approve_handler)
         self.application.add_handler(decline_handler)
@@ -118,6 +122,36 @@ class TelegramBot:
         )
 
         await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+
+    async def handle_new_member(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle new members joining the group"""
+        for member in update.message.new_chat_members:
+            # Skip if the new member is the bot itself
+            if member.id == context.bot.id:
+                continue
+            
+            # Check if user already has a pending request
+            existing_request = db.get_request(member.id)
+            if existing_request and existing_request["status"] == "pending":
+                await update.message.reply_text(
+                    f"Welcome {member.first_name}! You already have a pending request. Please wait for admin approval."
+                )
+                continue
+
+            # Create join request button
+            keyboard = [
+                [InlineKeyboardButton("Join Our Community", callback_data="join_group")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            welcome_text = (
+                f"Hello {member.first_name}! 👋\n\n"
+                "Welcome to our community! To join our group, please click the button below "
+                "and complete a short application form.\n\n"
+                "We'll review your application and get back to you soon!"
+            )
+
+            await update.message.reply_text(welcome_text, reply_markup=reply_markup)
 
     async def start_application(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
