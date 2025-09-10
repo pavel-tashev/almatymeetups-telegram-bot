@@ -71,9 +71,15 @@ class TelegramBot:
             self.decline_request, pattern="^decline_"
         )
 
+        # Verification message handler (for pre-filled messages)
+        verification_message_handler = MessageHandler(
+            filters.TEXT & ~filters.COMMAND, self.handle_verification_message
+        )
+
         # Add handlers
         self.application.add_handler(start_handler)
         self.application.add_handler(join_request_handler)
+        self.application.add_handler(verification_message_handler)
         self.application.add_handler(join_conversation)
         self.application.add_handler(approve_handler)
         self.application.add_handler(decline_handler)
@@ -138,6 +144,34 @@ class TelegramBot:
             "Welcome! To join our community, please use the invite link and follow the verification process."
         )
 
+    async def handle_verification_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle pre-filled verification messages from users"""
+        user = update.effective_user
+        message_text = update.message.text
+
+        logger.info(f"Verification message received from user {user.id}: {message_text}")
+
+        # Check if this is a verification message (contains user ID)
+        if "My user ID is" in message_text and str(user.id) in message_text:
+            logger.info(f"User {user.id} sent verification message, starting verification process")
+            
+            # Check if user already has a pending request
+            existing_request = db.get_request(user.id)
+            if existing_request and existing_request["status"] == "pending":
+                logger.info(f"User {user.id} already has pending request")
+                await update.message.reply_text(
+                    "⏳ You already have a pending request. Please wait for admin approval."
+                )
+                return
+
+            # Start verification process
+            return await self.start_verification_process(update, context)
+        
+        # If not a verification message, provide instructions
+        await update.message.reply_text(
+            "👋 Hello! To join our community, please use the invite link provided by an admin and click the verification button."
+        )
+
     async def start_verification_process(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
@@ -198,9 +232,14 @@ class TelegramBot:
             )
             return
 
-        # Create deep-link button to start verification
-        deep_link = f"https://t.me/{context.bot.username}?start=verify_{user.id}"
-        keyboard = [[InlineKeyboardButton("🔐 Start Verification", url=deep_link)]]
+        # Create pre-filled message link for verification
+        # This will open the bot chat with a pre-filled message
+        verification_message = f"Hi! I'd like to join the group. My user ID is {user.id}."
+        encoded_message = verification_message.replace(" ", "%20").replace("!", "%21")
+        bot_link = f"https://t.me/{context.bot.username}?text={encoded_message}"
+        
+        # Create button with the pre-filled message link
+        keyboard = [[InlineKeyboardButton("🔐 Start Verification", url=bot_link)]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         verification_text = (
