@@ -9,6 +9,7 @@ from telegram.error import TelegramError
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
+    ChatJoinRequestHandler,
     CommandHandler,
     ContextTypes,
     ConversationHandler,
@@ -60,9 +61,7 @@ class TelegramBot:
         )
 
         # Chat join request handler (for invite links)
-        join_request_handler = MessageHandler(
-            filters.StatusUpdate.CHAT_JOIN_REQUEST, self.handle_chat_join_request
-        )
+        join_request_handler = ChatJoinRequestHandler(self.handle_chat_join_request)
 
         # Admin approval handlers
         approve_handler = CallbackQueryHandler(
@@ -102,14 +101,16 @@ class TelegramBot:
         """Handle /start command"""
         user = update.effective_user
         args = context.args
-        
-        logger.info(f"Start command received from user {user.id} ({user.first_name}) with args: {args}")
+
+        logger.info(
+            f"Start command received from user {user.id} ({user.first_name}) with args: {args}"
+        )
 
         # Check if this is a verification deep-link
         if args and args[0].startswith("verify_"):
             user_id_from_link = int(args[0].split("_")[1])
             logger.info(f"Verification deep-link for user {user_id_from_link}")
-            
+
             # Verify the user ID matches
             if user.id != user_id_from_link:
                 logger.warning(f"User ID mismatch: {user.id} vs {user_id_from_link}")
@@ -117,7 +118,7 @@ class TelegramBot:
                     "❌ This verification link is not for your account. Please use the correct link."
                 )
                 return
-            
+
             # Check if user already has a pending request
             existing_request = db.get_request(user.id)
             if existing_request and existing_request["status"] == "pending":
@@ -137,7 +138,9 @@ class TelegramBot:
             "Welcome! To join our community, please use the invite link and follow the verification process."
         )
 
-    async def start_verification_process(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def start_verification_process(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
         """Start the verification process for a user who clicked the deep-link"""
         user = update.effective_user
         logger.info(f"Starting verification process for user {user.id}")
@@ -159,7 +162,9 @@ class TelegramBot:
         # Start with first question
         questions = get_all_questions()
         first_question = questions[0]
-        logger.info(f"Starting questions for user {user.id}, question 1 of {len(questions)}")
+        logger.info(
+            f"Starting questions for user {user.id}, question 1 of {len(questions)}"
+        )
 
         await update.message.reply_text(
             f"🔐 **Verification Process Started**\n\n"
@@ -178,24 +183,24 @@ class TelegramBot:
         join_request = update.chat_join_request
         user = join_request.from_user
         chat = join_request.chat
-        
-        logger.info(f"Chat join request received from user {user.id} ({user.first_name}) for chat {chat.id}")
-        
+
+        logger.info(
+            f"Chat join request received from user {user.id} ({user.first_name}) for chat {chat.id}"
+        )
+
         # Check if user already has a pending request
         existing_request = db.get_request(user.id)
         if existing_request and existing_request["status"] == "pending":
             logger.info(f"User {user.id} already has pending request")
             await context.bot.send_message(
                 chat_id=chat.id,
-                text=f"@{user.username or user.first_name} already has a pending request. Please wait for admin approval."
+                text=f"@{user.username or user.first_name} already has a pending request. Please wait for admin approval.",
             )
             return
 
         # Create deep-link button to start verification
         deep_link = f"https://t.me/{context.bot.username}?start=verify_{user.id}"
-        keyboard = [
-            [InlineKeyboardButton("🔐 Start Verification", url=deep_link)]
-        ]
+        keyboard = [[InlineKeyboardButton("🔐 Start Verification", url=deep_link)]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         verification_text = (
@@ -206,17 +211,15 @@ class TelegramBot:
         )
 
         try:
-            logger.info(f"Posting verification message for user {user.id} in chat {chat.id}")
+            logger.info(
+                f"Posting verification message for user {user.id} in chat {chat.id}"
+            )
             await context.bot.send_message(
-                chat_id=chat.id,
-                text=verification_text,
-                reply_markup=reply_markup
+                chat_id=chat.id, text=verification_text, reply_markup=reply_markup
             )
             logger.info(f"Successfully posted verification message for user {user.id}")
         except Exception as e:
             logger.error(f"Failed to post verification message for user {user.id}: {e}")
-
-
 
     async def handle_answer(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle user's answer to a question"""
@@ -227,7 +230,9 @@ class TelegramBot:
         current_question_index = context.user_data["current_question"]
         current_question = questions[current_question_index]
 
-        logger.info(f"User {user.id} answered question {current_question_index + 1}: {current_question['id']}")
+        logger.info(
+            f"User {user.id} answered question {current_question_index + 1}: {current_question['id']}"
+        )
 
         # Store the answer
         context.user_data["answers"][current_question["id"]] = answer
@@ -239,7 +244,9 @@ class TelegramBot:
             # More questions to ask
             next_question = questions[next_question_index]
             context.user_data["current_question"] = next_question_index
-            logger.info(f"Moving to question {next_question_index + 1} for user {user.id}")
+            logger.info(
+                f"Moving to question {next_question_index + 1} for user {user.id}"
+            )
 
             await update.message.reply_text(
                 f"**Question {next_question_index + 1} of {len(questions)}:**\n"
@@ -247,7 +254,9 @@ class TelegramBot:
             )
         else:
             # All questions answered, submit to admins
-            logger.info(f"All questions answered for user {user.id}, submitting to admins")
+            logger.info(
+                f"All questions answered for user {user.id}, submitting to admins"
+            )
             await self.submit_to_admins(update, context)
             return ConversationHandler.END
 
@@ -259,12 +268,16 @@ class TelegramBot:
         request_id = context.user_data["request_id"]
         answers = context.user_data["answers"]
 
-        logger.info(f"Submitting application for user {user.id} (request {request_id}) to admin chat")
+        logger.info(
+            f"Submitting application for user {user.id} (request {request_id}) to admin chat"
+        )
 
         # Save all answers to database
         for question_id, answer in answers.items():
             db.add_response(request_id, question_id, answer)
-        logger.info(f"Saved {len(answers)} answers to database for request {request_id}")
+        logger.info(
+            f"Saved {len(answers)} answers to database for request {request_id}"
+        )
 
         # Create admin message
         admin_text = f"🔔 **New Join Request**\n\n"
@@ -332,7 +345,7 @@ class TelegramBot:
 
         request_id = int(query.data.split("_")[1])
         logger.info(f"Admin approving request {request_id}")
-        
+
         request = db.get_request_by_id(request_id)
 
         if not request:
@@ -362,7 +375,9 @@ class TelegramBot:
             await context.bot.approve_chat_join_request(
                 chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
             )
-            logger.info(f"Successfully approved chat join request for user {request['user_id']}")
+            logger.info(
+                f"Successfully approved chat join request for user {request['user_id']}"
+            )
 
             # Notify user
             await context.bot.send_message(
@@ -373,7 +388,9 @@ class TelegramBot:
             logger.info(f"Sent approval notification to user {request['user_id']}")
 
         except TelegramError as e:
-            logger.error(f"Failed to approve chat join request for user {request['user_id']}: {e}")
+            logger.error(
+                f"Failed to approve chat join request for user {request['user_id']}: {e}"
+            )
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
                 text=f"❌ Failed to approve request for user {request['first_name']}. "
@@ -387,7 +404,7 @@ class TelegramBot:
 
         request_id = int(query.data.split("_")[1])
         logger.info(f"Admin declining request {request_id}")
-        
+
         request = db.get_request_by_id(request_id)
 
         if not request:
@@ -417,7 +434,9 @@ class TelegramBot:
             await context.bot.decline_chat_join_request(
                 chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
             )
-            logger.info(f"Successfully declined chat join request for user {request['user_id']}")
+            logger.info(
+                f"Successfully declined chat join request for user {request['user_id']}"
+            )
 
             # Notify user
             await context.bot.send_message(
@@ -429,7 +448,9 @@ class TelegramBot:
             logger.info(f"Sent decline notification to user {request['user_id']}")
 
         except TelegramError as e:
-            logger.error(f"Failed to decline chat join request for user {request['user_id']}: {e}")
+            logger.error(
+                f"Failed to decline chat join request for user {request['user_id']}: {e}"
+            )
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
                 text=f"❌ Failed to decline request for user {request['first_name']}. "
