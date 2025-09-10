@@ -47,7 +47,9 @@ class TelegramBot:
         start_handler = CommandHandler("start", self.start_command)
 
         # Group join handler
-        join_handler = MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, self.handle_new_member)
+        join_handler = MessageHandler(
+            filters.StatusUpdate.NEW_CHAT_MEMBERS, self.handle_new_member
+        )
 
         # Join request conversation
         join_conversation = ConversationHandler(
@@ -123,13 +125,16 @@ class TelegramBot:
 
         await update.message.reply_text(welcome_text, reply_markup=reply_markup)
 
-    async def handle_new_member(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_new_member(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
         """Handle new members joining the group"""
+        logger.info(f"New member detected: {update.message.new_chat_members}")
         for member in update.message.new_chat_members:
             # Skip if the new member is the bot itself
             if member.id == context.bot.id:
                 continue
-            
+
             # Check if user already has a pending request
             existing_request = db.get_request(member.id)
             if existing_request and existing_request["status"] == "pending":
