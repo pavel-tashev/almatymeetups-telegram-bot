@@ -103,7 +103,7 @@ class TelegramBot:
 
         # Admin stats command
         stats_handler = CommandHandler("stats", self.admin_handlers.user_stats)
-        
+
         # Help command (shows different options for admin vs regular users)
         help_handler = CommandHandler("help", self.admin_handlers.help_command)
 
@@ -127,13 +127,11 @@ class TelegramBot:
 
     async def set_bot_commands(self, application):
         """Set bot commands menu"""
-        from config.settings import ADMIN_CHAT_ID
-        
-        # Set different commands for admin vs regular users
-        # Note: Telegram doesn't support per-user command menus, so we'll handle this in the command handlers
+        # Note: Telegram doesn't support per-user command menus, so we show the most common commands
+        # Users will see different options based on their role when they use /help
         commands = [
+            BotCommand("help", "Show available commands"),
             BotCommand("start", COMMAND_START_DESC),
-            BotCommand("help", "Show available commands")
         ]
         try:
             await application.bot.set_my_commands(commands)

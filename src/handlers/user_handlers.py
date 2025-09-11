@@ -48,9 +48,7 @@ class ApplicationHandlers:
                 "You're logged in as an admin! Here are your available commands:\n\n"
                 "📊 `/stats` - View user statistics\n"
                 "📢 `/broadcast <message>` - Send message to all approved users\n"
-                "❓ `/help` - Show detailed help\n\n"
-                "💡 **Note:** You don't need to use `/start` for approval requests. "
-                "You'll receive approval requests automatically in your admin chat."
+                "❓ `/help` - Show detailed help"
             )
             try:
                 await update.message.reply_text(admin_message, parse_mode="Markdown")
@@ -370,9 +368,9 @@ class ApplicationHandlers:
 
         # Create admin message with Almaty timezone (handles DST automatically)
         import pytz
-        
+
         # Almaty timezone with automatic DST handling
-        almaty_tz = pytz.timezone('Asia/Almaty')
+        almaty_tz = pytz.timezone("Asia/Almaty")
         almaty_time = datetime.now(almaty_tz)
 
         admin_text = admin_application_text(
