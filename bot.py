@@ -1,34 +1,44 @@
-import logging
 import os
 from datetime import datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from telegram import (BotCommand, InlineKeyboardButton, InlineKeyboardMarkup,
-                      Update)
+from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import TelegramError
-from telegram.ext import (Application, CallbackQueryHandler,
-                          ChatJoinRequestHandler, CommandHandler, ContextTypes,
-                          ConversationHandler, MessageHandler, filters)
+from telegram.ext import (
+    Application,
+    CallbackQueryHandler,
+    ChatJoinRequestHandler,
+    CommandHandler,
+    ContextTypes,
+    ConversationHandler,
+    MessageHandler,
+    filters,
+)
 from telegram.request import HTTPXRequest
 
-from config import (ADMIN_CHAT_ID, BOT_TOKEN, REQUEST_TIMEOUT_HOURS,
-                    TARGET_GROUP_ID)
+from config import ADMIN_CHAT_ID, BOT_TOKEN, REQUEST_TIMEOUT_HOURS, TARGET_GROUP_ID
 from database import Database
-from texts import (BACK_BUTTON, COMPLETE_BUTTON, OPTION_COUCHSURFING,
-                   OPTION_INVITED, OPTION_OTHER, PENDING_REQUEST_MSG,
-                   QUESTION_COUCHSURFING, QUESTION_INVITED, QUESTION_OTHER,
-                   SUBMITTED_MSG, USER_APPROVED_DM, USER_DECLINED_DM,
-                   WELCOME_TEXT, admin_approved_added,
-                   admin_approved_link_sent, admin_declined, complete_prompt,
-                   user_approved_with_link)
-
-# Configure logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
+from texts import (
+    BACK_BUTTON,
+    COMPLETE_BUTTON,
+    OPTION_COUCHSURFING,
+    OPTION_INVITED,
+    OPTION_OTHER,
+    PENDING_REQUEST_MSG,
+    QUESTION_COUCHSURFING,
+    QUESTION_INVITED,
+    QUESTION_OTHER,
+    SUBMITTED_MSG,
+    USER_APPROVED_DM,
+    USER_DECLINED_DM,
+    WELCOME_TEXT,
+    admin_approved_added,
+    admin_approved_link_sent,
+    admin_declined,
+    complete_prompt,
+    user_approved_with_link,
 )
-logger = logging.getLogger(__name__)
 
 # Conversation states
 WAITING_FOR_EXPLANATION, WAITING_FOR_ANSWER = range(2)
@@ -106,7 +116,10 @@ class TelegramBot:
         commands = [
             BotCommand("start", "Start the application process"),
         ]
-        await application.bot.set_my_commands(commands)
+        try:
+            await application.bot.set_my_commands(commands)
+        except Exception:
+            pass
 
     def setup_scheduler(self):
         """Setup the scheduler for auto-rejection"""
@@ -120,12 +133,10 @@ class TelegramBot:
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle the /start command"""
         user = update.effective_user
-        logger.info(f"Start command received from user {user.id} ({user.first_name})")
 
         # Check if user already has a pending request
         existing_request = db.get_request(user.id)
         if existing_request and existing_request["status"] == "pending":
-            logger.info(f"User {user.id} already has pending request")
             await update.message.reply_text(PENDING_REQUEST_MSG)
             return ConversationHandler.END
 
@@ -136,7 +147,6 @@ class TelegramBot:
             first_name=user.first_name,
             last_name=user.last_name,
         )
-        logger.info(f"Created new request {request_id} for user {user.id}")
 
         # Store request_id in context
         context.user_data["request_id"] = request_id
@@ -179,7 +189,6 @@ class TelegramBot:
         await query.answer()
 
         option = query.data.split("_")[1]
-        logger.info(f"User {query.from_user.id} selected option: {option}")
 
         # Store the selected option
         context.user_data["selected_option"] = option
@@ -206,8 +215,6 @@ class TelegramBot:
         query = update.callback_query
         await query.answer()
 
-        logger.info(f"User {query.from_user.id} clicked back button")
-
         # Return to welcome message
         await self.send_welcome_message(update, context)
         return WAITING_FOR_EXPLANATION
@@ -219,24 +226,16 @@ class TelegramBot:
         user = update.effective_user
         explanation_text = update.message.text
 
-        logger.info(
-            f"User {user.id} provided free-text explanation from welcome: {explanation_text}"
-        )
-
         # Treat as 'other' path; store selection and answer
         context.user_data["selected_option"] = "other"
         context.user_data["answer"] = explanation_text
 
         # Show Complete Application button (same as after answering a follow-up)
-        complete_text = (
-            f"✅ Thank you for your answer!\n\n"
-            f"Your response: {explanation_text}\n\n"
-            f"Click the button below to complete your application:"
-        )
+        complete_text = complete_prompt(explanation_text)
 
         keyboard = [
-            [InlineKeyboardButton("✅ Complete Application", callback_data="complete")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="back")],
+            [InlineKeyboardButton(COMPLETE_BUTTON, callback_data="complete")],
+            [InlineKeyboardButton(BACK_BUTTON, callback_data="back")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -249,8 +248,6 @@ class TelegramBot:
         user = update.effective_user
         answer = update.message.text
         selected_option = context.user_data.get("selected_option", "unknown")
-
-        logger.info(f"User {user.id} answered: {answer} for option: {selected_option}")
 
         # Store the answer
         context.user_data["answer"] = answer
@@ -280,8 +277,6 @@ class TelegramBot:
         selected_option = context.user_data.get("selected_option", "unknown")
         answer = context.user_data.get("answer", "")
 
-        logger.info(f"User {user.id} completed application for request {request_id}")
-
         # Create the full explanation
         if selected_option == "couchsurfing":
             explanation = f"Found through Couchsurfing. Account: {answer}"
@@ -309,16 +304,13 @@ class TelegramBot:
     ):
         """Submit application to admin chat"""
         user = update.effective_user
-        logger.info(
-            f"Submitting application for user {user.id} (request {request_id}) to admin chat"
-        )
 
         # Create admin message
         admin_text = admin_application_text(
             first_name=user.first_name,
             username=user.username,
             user_id=user.id,
-            when=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            when=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             request_id=request_id,
             explanation=explanation,
         )
@@ -342,13 +334,10 @@ class TelegramBot:
                 reply_markup=reply_markup,
                 parse_mode="Markdown",
             )
-            logger.info(f"Successfully sent admin message for request {request_id}")
-
             # Store admin message ID
             db.update_request_status(request_id, "pending", admin_message.message_id)
-
-        except Exception as e:
-            logger.error(f"Failed to send admin message for request {request_id}: {e}")
+        except Exception:
+            pass
 
     async def handle_chat_join_request(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -358,14 +347,9 @@ class TelegramBot:
         user = join_request.from_user
         chat = join_request.chat
 
-        logger.info(
-            f"Chat join request received from user {user.id} ({user.first_name}) for chat {chat.id}"
-        )
-
         # Check if user already has a pending request
         existing_request = db.get_request(user.id)
         if existing_request and existing_request["status"] == "pending":
-            logger.info(f"User {user.id} already has pending request")
             await context.bot.send_message(
                 chat_id=chat.id,
                 text=f"@{user.username or user.first_name} already has a pending request. Please wait for admin approval.",
@@ -391,15 +375,11 @@ class TelegramBot:
         )
 
         try:
-            logger.info(
-                f"Posting verification message for user {user.id} in chat {chat.id}"
-            )
             await context.bot.send_message(
                 chat_id=chat.id, text=verification_text, reply_markup=reply_markup
             )
-            logger.info(f"Successfully posted verification message for user {user.id}")
-        except Exception as e:
-            logger.error(f"Failed to post verification message for user {user.id}: {e}")
+        except Exception:
+            pass
 
     async def approve_request(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle admin approval"""
@@ -407,7 +387,6 @@ class TelegramBot:
         await query.answer()
 
         request_id = int(query.data.split("_")[1])
-        logger.info(f"Admin approving request {request_id}")
 
         request = db.get_request_by_id(request_id)
         if not request:
@@ -419,9 +398,6 @@ class TelegramBot:
             try:
                 await context.bot.approve_chat_join_request(
                     chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
-                )
-                logger.info(
-                    f"Successfully approved chat join request for user {request['user_id']}"
                 )
 
                 # Update request status
@@ -443,10 +419,8 @@ class TelegramBot:
                         chat_id=request["user_id"],
                         text=USER_APPROVED_DM,
                     )
-                except Exception as notify_err:
-                    logger.error(
-                        f"Failed to notify user {request['user_id']}: {notify_err}"
-                    )
+                except Exception:
+                    pass
                 return
 
             except TelegramError as e:
@@ -454,9 +428,6 @@ class TelegramBot:
                 if "Hide_requester_missing" in str(
                     e
                 ) or "CHAT_JOIN_REQUEST_NOT_FOUND" in str(e):
-                    logger.info(
-                        f"No join request found for user {request['user_id']}, generating a single-use invite link"
-                    )
                     try:
                         invite = await context.bot.create_chat_invite_link(
                             chat_id=TARGET_GROUP_ID,
@@ -467,9 +438,6 @@ class TelegramBot:
                         invite_link = (
                             getattr(invite, "invite_link", None)
                             or invite["invite_link"]
-                        )
-                        logger.info(
-                            f"Generated a single-use invite link for user {request['user_id']}"
                         )
 
                         # Update request status
@@ -493,9 +461,6 @@ class TelegramBot:
                         return
 
                     except TelegramError as gen_err:
-                        logger.error(
-                            f"Failed to generate/send invite link for user {request['user_id']}: {gen_err}"
-                        )
                         await context.bot.send_message(
                             chat_id=ADMIN_CHAT_ID,
                             text=f"❌ Failed to send invite link to user {request['user_id']}: {gen_err}",
@@ -506,7 +471,6 @@ class TelegramBot:
                     raise e
 
         except TelegramError as e:
-            logger.error(f"Failed to approve user {request['user_id']}: {e}")
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
                 text=f"❌ Failed to approve user {request['user_id']}: {e}",
@@ -518,7 +482,6 @@ class TelegramBot:
         await query.answer()
 
         request_id = int(query.data.split("_")[1])
-        logger.info(f"Admin declining request {request_id}")
 
         request = db.get_request_by_id(request_id)
         if not request:
@@ -531,17 +494,12 @@ class TelegramBot:
                 await context.bot.decline_chat_join_request(
                     chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
                 )
-                logger.info(
-                    f"Successfully declined chat join request for user {request['user_id']}"
-                )
             except TelegramError as e:
-                # If no join request exists, just log it (no need to decline)
+                # If no join request exists, just continue
                 if "Hide_requester_missing" in str(
                     e
                 ) or "CHAT_JOIN_REQUEST_NOT_FOUND" in str(e):
-                    logger.info(
-                        f"No join request found for user {request['user_id']}, just marking as declined"
-                    )
+                    pass
                 else:
                     raise e
 
@@ -562,11 +520,10 @@ class TelegramBot:
                     chat_id=request["user_id"],
                     text=USER_DECLINED_DM,
                 )
-            except Exception as e:
-                logger.error(f"Failed to notify user {request['user_id']}: {e}")
+            except Exception:
+                pass
 
         except TelegramError as e:
-            logger.error(f"Failed to decline user {request['user_id']}: {e}")
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
                 text=f"❌ Failed to decline user {request['user_id']}: {e}",
@@ -577,7 +534,6 @@ class TelegramBot:
     ):
         """Cancel the application process"""
         user = update.effective_user
-        logger.info(f"User {user.id} cancelled application")
 
         await update.message.reply_text(
             "❌ Application cancelled. You can start again anytime with /start"
@@ -586,14 +542,9 @@ class TelegramBot:
 
     async def check_expired_requests(self):
         """Check for expired requests and auto-decline them"""
-        logger.info("Checking for expired requests...")
         expired_requests = db.get_expired_requests()
 
         for request in expired_requests:
-            logger.info(
-                f"Auto-declining expired request {request['id']} for user {request['user_id']}"
-            )
-
             try:
                 # Decline the chat join request
                 await self.application.bot.decline_chat_join_request(
@@ -609,14 +560,11 @@ class TelegramBot:
                     text="⏰ Your application has expired and been automatically declined. You can apply again anytime.",
                 )
 
-                logger.info(f"Successfully auto-declined request {request['id']}")
-
-            except Exception as e:
-                logger.error(f"Failed to auto-decline request {request['id']}: {e}")
+            except Exception:
+                pass
 
     async def run(self):
         """Run the bot"""
-        logger.info("Starting bot...")
         await self.application.run_polling()
 
 
