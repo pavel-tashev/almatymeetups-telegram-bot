@@ -3,7 +3,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from config.settings import ADMIN_CHAT_ID, TARGET_GROUP_ID
-from database.models import Database
+from database.model import Model
 from messages.texts import (
     ADMIN_DECLINED_MSG,
     ERROR_APPROVE_FAILED,
@@ -18,7 +18,7 @@ from messages.texts import (
 )
 
 # Initialize database
-db = Database()
+db = Model()
 
 
 async def is_admin_user(bot, user_id: int) -> bool:
@@ -41,7 +41,7 @@ class AdminHandlers:
 
         request_id = int(query.data.split("_")[1])
 
-        request = db.get_request_by_id(request_id)
+        request = db.requests.get_by_id(request_id)
         if not request:
             await query.edit_message_text(REQUEST_NOT_FOUND)
             return
@@ -54,12 +54,12 @@ class AdminHandlers:
                 )
 
                 # Update request status
-                db.update_request_status(
+                db.requests.update_status(
                     request_id, "approved", query.message.message_id
                 )
 
-                # Add user to approved users table
-                db.add_approved_user(
+                # Add user to approved users table (upsert operation)
+                db.users.upsert(
                     user_id=request["user_id"],
                     username=request["username"],
                     first_name=request["first_name"],
@@ -102,12 +102,12 @@ class AdminHandlers:
                         )
 
                         # Update request status
-                        db.update_request_status(
+                        db.requests.update_status(
                             request_id, "approved", query.message.message_id
                         )
 
-                        # Add user to approved users table
-                        db.add_approved_user(
+                        # Add user to approved users table (upsert operation)
+                        db.users.upsert(
                             user_id=request["user_id"],
                             username=request["username"],
                             first_name=request["first_name"],
@@ -154,7 +154,7 @@ class AdminHandlers:
 
         request_id = int(query.data.split("_")[1])
 
-        request = db.get_request_by_id(request_id)
+        request = db.requests.get_by_id(request_id)
         if not request:
             await query.edit_message_text(REQUEST_NOT_FOUND)
             return
@@ -175,7 +175,7 @@ class AdminHandlers:
                     raise e
 
             # Update request status
-            db.update_request_status(request_id, "declined", query.message.message_id)
+            db.requests.update_status(request_id, "declined", query.message.message_id)
 
             # Delete the admin message and send confirmation
             await query.delete_message()
@@ -222,7 +222,7 @@ class AdminHandlers:
             return
 
         # Get all active users
-        users = db.get_all_active_users()
+        users = db.users.get_all_active()
 
         if not users:
             await update.message.reply_text("❌ No approved users found.")
@@ -239,12 +239,12 @@ class AdminHandlers:
                 )
                 successful_sends += 1
                 # Update last contacted timestamp
-                db.update_last_contacted(user["user_id"])
+                db.users.update_last_contacted(user["user_id"])
             except Exception as e:
                 failed_sends += 1
                 # If user blocked the bot, deactivate them
                 if "Forbidden" in str(e) or "blocked" in str(e).lower():
-                    db.deactivate_user(user["user_id"])
+                    db.users.deactivate(user["user_id"])
 
         # Send summary to admin
         summary = (
@@ -266,7 +266,7 @@ class AdminHandlers:
             return
 
         # Get all active users
-        users = db.get_all_active_users()
+        users = db.users.get_all_active()
 
         # Debug logging
         import logging

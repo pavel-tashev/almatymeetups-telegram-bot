@@ -2,7 +2,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes, ConversationHandler
 
 from config.questions import QUESTIONS
-from database.models import Database
+from database.model import Model
 from messages.texts import (
     BACK_BUTTON,
     COMPLETE_BUTTON,
@@ -17,7 +17,7 @@ from messages.texts import (
 WAITING_FOR_EXPLANATION, WAITING_FOR_ANSWER = range(2)
 
 # Initialize database
-db = Database()
+db = Model()
 
 
 class ApplicationHandlers:
@@ -58,7 +58,7 @@ class ApplicationHandlers:
             return ConversationHandler.END
 
         # Check if user already has a pending request
-        existing_request = db.get_request(user.id)
+        existing_request = db.requests.get_by_user_id(user.id)
         logger.info(f"Checking existing request for user {user.id}: {existing_request}")
 
         if existing_request and existing_request["status"] == "pending":
@@ -72,7 +72,7 @@ class ApplicationHandlers:
 
         # Create new request
         logger.info(f"Creating new request for user {user.id}")
-        request_id = db.create_request(
+        request_id = db.requests.create(
             user_id=user.id,
             username=user.username,
             first_name=user.first_name,
@@ -338,7 +338,7 @@ class ApplicationHandlers:
         logger.info(f"Generated explanation: {explanation[:100]}...")
 
         # Save explanation to database
-        db.update_user_explanation(request_id, explanation)
+        db.requests.update_user_explanation(request_id, explanation)
         logger.info(f"Saved explanation to database for request {request_id}")
 
         # Submit to admins
@@ -401,7 +401,7 @@ class ApplicationHandlers:
                 parse_mode="Markdown",
             )
             # Store admin message ID
-            db.update_request_status(request_id, "pending", admin_message.message_id)
+            db.requests.update_status(request_id, "pending", admin_message.message_id)
         except Exception:
             pass
 
@@ -419,6 +419,7 @@ class ApplicationHandlers:
     async def add_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle the /add command - add user to the user table"""
         import logging
+
         from telegram.error import Forbidden, NetworkError, TimedOut
 
         logger = logging.getLogger(__name__)
@@ -428,42 +429,41 @@ class ApplicationHandlers:
             f"ADD command received from user {user.id} (@{user.username}) - {user.first_name}"
         )
 
-        # Check if user is already in the users table
-        existing_user = db.get_user_by_id(user.id)
-        if existing_user:
-            message = (
-                "✅ **You're already in our community!**\n\n"
-                "You're already registered in our user database. "
-                "You'll receive community updates and announcements."
-            )
-            try:
-                await update.message.reply_text(message, parse_mode="Markdown")
-                logger.info(f"User {user.id} already exists in users table")
-            except (TimedOut, NetworkError, Forbidden) as e:
-                logger.error(f"Error sending message to user {user.id}: {e}")
-            return
-
-        # Add user to the users table
+        # Add user to the users table (upsert operation)
         try:
-            user_db_id = db.add_approved_user(
+            # Check if user already exists to provide appropriate message
+            existing_user = db.users.get_by_id(user.id)
+
+            user_db_id = db.users.upsert_user(
                 user_id=user.id,
                 username=user.username,
                 first_name=user.first_name,
                 last_name=user.last_name,
             )
-            
-            message = (
-                "🎉 **Welcome to our community!**\n\n"
-                "You've been successfully added to our user database. "
-                "You'll now receive community updates, announcements, and meetup notifications.\n\n"
-                "Thank you for joining Almaty Meetups! 🇰🇿"
-            )
-            
+
+            if existing_user:
+                message = (
+                    "✅ **You're already in our community!**\n\n"
+                    "You're already registered in our user database. "
+                    "Your information has been updated. "
+                    "You'll receive community updates and announcements."
+                )
+                logger.info(
+                    f"User {user.id} already existed, updated record with ID {user_db_id}"
+                )
+            else:
+                message = (
+                    "🎉 **Welcome to our community!**\n\n"
+                    "You've been successfully added to our user database. "
+                    "You'll now receive community updates, announcements, and meetup notifications.\n\n"
+                    "Thank you for joining Almaty Meetups! 🇰🇿"
+                )
+                logger.info(f"User {user.id} added to users table with ID {user_db_id}")
+
             await update.message.reply_text(message, parse_mode="Markdown")
-            logger.info(f"User {user.id} added to users table with ID {user_db_id}")
-            
+
         except Exception as e:
-            logger.error(f"Error adding user {user.id} to users table: {e}")
+            logger.error(f"Error upserting user {user.id} to users table: {e}")
             error_message = (
                 "❌ **Something went wrong**\n\n"
                 "We couldn't add you to our community database right now. "
@@ -472,4 +472,6 @@ class ApplicationHandlers:
             try:
                 await update.message.reply_text(error_message, parse_mode="Markdown")
             except Exception as reply_error:
-                logger.error(f"Error sending error message to user {user.id}: {reply_error}")
+                logger.error(
+                    f"Error sending error message to user {user.id}: {reply_error}"
+                )
