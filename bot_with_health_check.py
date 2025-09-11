@@ -37,21 +37,18 @@ async def health_check(request):
     )
 
 
-def start_bot():
+async def start_bot():
     """Start the Telegram bot"""
     global bot_instance
     try:
         bot_instance = TelegramBot()
         logger.info("Bot instance created successfully")
 
-        # Start the bot in the background using a thread
-        import threading
-
-        bot_thread = threading.Thread(
-            target=bot_instance.application.run_polling, daemon=True
-        )
-        bot_thread.start()
-        logger.info("Bot started successfully in background thread")
+        # Initialize the bot application properly
+        await bot_instance.application.initialize()
+        await bot_instance.application.start()
+        await bot_instance.application.updater.start_polling()
+        logger.info("Bot started successfully with polling")
 
     except Exception as e:
         logger.error(f"Failed to start bot: {e}")
@@ -67,7 +64,7 @@ async def init_app():
     app.router.add_get("/", health_check)  # Root endpoint
 
     # Start the bot when the app starts
-    start_bot()
+    await start_bot()
 
     return app
 
@@ -96,6 +93,17 @@ async def main():
     except KeyboardInterrupt:
         logger.info("Shutting down...")
     finally:
+        # Clean up bot
+        if bot_instance:
+            try:
+                await bot_instance.application.updater.stop()
+                await bot_instance.application.stop()
+                await bot_instance.application.shutdown()
+                logger.info("Bot shutdown completed")
+            except Exception as e:
+                logger.error(f"Error during bot shutdown: {e}")
+
+        # Clean up web server
         await runner.cleanup()
 
 
