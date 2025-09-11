@@ -150,7 +150,7 @@ class Users:
         first_name: str = None,
         last_name: str = None,
     ) -> int:
-        existing_user = self.get_user_by_id(user_id)
+        existing_user = self.get_by_id(user_id)
 
         if existing_user:
             self.update(
