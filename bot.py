@@ -448,15 +448,15 @@ class TelegramBot:
                         f"No join request found for user {request['user_id']}, trying to add directly"
                     )
                     try:
-                        await context.bot.add_chat_members(
-                            chat_id=TARGET_GROUP_ID, user_ids=[request["user_id"]]
+                        await context.bot.invite_chat_member(
+                            chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
                         )
                         logger.info(
-                            f"Successfully added user {request['user_id']} directly to group"
+                            f"Successfully invited user {request['user_id']} directly to group"
                         )
                     except TelegramError as add_error:
                         logger.error(
-                            f"Failed to add user {request['user_id']} directly: {add_error}"
+                            f"Failed to invite user {request['user_id']} directly: {add_error}"
                         )
                         raise add_error
                 else:
