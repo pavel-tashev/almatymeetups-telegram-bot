@@ -64,10 +64,6 @@ def admin_approved_link_sent(first_name: str) -> str:
     return f"✅ **{first_name}** approved. Single-use invite link has been sent to the user."
 
 
-def admin_declined(first_name: str) -> str:
-    return f"❌ **{first_name}** has been **declined**."
-
-
 # DM to user
 USER_APPROVED_DM = (
     "🎉 Congratulations! Your application has been approved. Welcome to our community!"
