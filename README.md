@@ -1,15 +1,16 @@
 # Almaty Meetups Telegram Bot
 
-A Telegram bot for managing group join requests with an approval workflow. Users can apply to join a group, answer questions, and admins can approve or decline requests.
+A Telegram bot for managing group join requests with an approval workflow. Users can apply to join a group through a direct bot link, answer questions, and admins can approve or decline requests.
 
 ## Features
 
-- **Join Request Flow**: Users can request to join the group through a button
-- **Question System**: Configurable questions that users must answer
+- **Direct Bot Link Flow**: Users start application via bot link (no group join required)
+- **Dynamic Options**: Configurable options for how users found the group
 - **Admin Approval**: Admins can approve or decline requests with buttons
-- **Auto-timeout**: Requests are automatically rejected after 24 hours
+- **Clickable User Links**: Admins can click user names to start conversations
 - **Message Management**: Admin messages are deleted after approval/decline with status notifications
-- **Database Storage**: All requests and responses are stored in SQLite
+- **Database Storage**: All requests and user explanations are stored in SQLite
+- **Clean Architecture**: Modular code structure with separated concerns
 
 ## Setup
 
@@ -45,8 +46,7 @@ Create a `.env` file in the project root:
 BOT_TOKEN=your_bot_token_here
 ADMIN_CHAT_ID=your_admin_chat_id_here
 TARGET_GROUP_ID=your_target_group_id_here
-REQUEST_TIMEOUT_HOURS=24
-DATABASE_URL=sqlite:///bot_database.db
+DATABASE_URL=sqlite:///data/bot_database.db
 ```
 
 ### 4. Local Development
@@ -60,7 +60,7 @@ pip install -r requirements.txt
 2. Run the bot:
 
 ```bash
-python bot.py
+python src/bot.py
 ```
 
 ## Deployment on Render
@@ -88,7 +88,6 @@ In the Render dashboard, go to your service → Environment tab and add:
 - `BOT_TOKEN`: Your bot token from BotFather
 - `ADMIN_CHAT_ID`: Your admin chat ID (negative number for groups)
 - `TARGET_GROUP_ID`: Your target group ID
-- `REQUEST_TIMEOUT_HOURS`: `24` (optional, defaults to 24)
 - `DATABASE_URL`: `sqlite:///data/bot_database.db`
 
 ### 4. Deploy
@@ -101,33 +100,55 @@ Click "Deploy" and wait for the deployment to complete.
 
 ## Workflow
 
-1. **User clicks "Join Our Community"** → Bot shows application form
-2. **User answers questions** → Bot stores responses in database
-3. **Bot sends to admin chat** → Admins see request with Approve/Decline buttons
-4. **Admin approves** → User is added to group, admin message is deleted, status notification sent
-5. **Admin declines** → User is notified, admin message is deleted, status notification sent
-6. **Auto-timeout** → After 24 hours, request is automatically rejected
+1. **User clicks bot link** → Bot shows welcome message with options
+2. **User selects option** → Bot asks follow-up question
+3. **User provides answer** → Bot shows "Complete Application" button
+4. **User completes application** → Bot sends to admin chat with Approve/Decline buttons
+5. **Admin approves** → User gets invite link or is added to group, admin message deleted
+6. **Admin declines** → User is notified, admin message is deleted
 
 ## Customization
 
-### Questions
+### Options Configuration
 
-Edit `questions.py` to modify the questions users must answer:
+Edit `src/config/questions.py` to modify the options and questions:
 
 ```python
-QUESTIONS = [
-    {
-        "id": "name",
-        "question": "What's your full name?",
-        "required": True
+QUESTIONS = {
+    "couchsurfing": {
+        "button_text": "🏠 Couchsurfing",
+        "question": "What's your Couchsurfing profile link or username?",
+        "explanation_template": "Found through Couchsurfing. Account: {answer}",
     },
-    # Add more questions...
-]
+    "invited": {
+        "button_text": "👥 Someone invited me",
+        "question": "What is the Telegram username of the person who invited you?",
+        "explanation_template": "Invited by: {answer}",
+    },
+    # Add more options...
+}
 ```
 
-### Timeout
+### Messages
 
-Change `REQUEST_TIMEOUT_HOURS` in your environment variables to modify the auto-rejection timeout.
+Edit `src/messages/texts.py` to customize all user-facing messages and admin notifications.
+
+## Project Structure
+
+```
+src/
+├── bot.py                    # Main bot orchestrator
+├── handlers/
+│   ├── user_handlers.py      # User application flow
+│   └── admin_handlers.py     # Admin approval/rejection
+├── config/
+│   ├── settings.py           # Bot configuration
+│   └── questions.py          # Options configuration
+├── database/
+│   └── models.py             # Database operations
+└── messages/
+    └── texts.py              # User-facing messages
+```
 
 ## Database Schema
 
@@ -138,17 +159,11 @@ Change `REQUEST_TIMEOUT_HOURS` in your environment variables to modify the auto-
 - `username`: Telegram username
 - `first_name`: User's first name
 - `last_name`: User's last name
-- `status`: pending/approved/declined/expired
+- `status`: pending/approved/declined
 - `created_at`: Request creation timestamp
 - `approved_at`: Approval timestamp
 - `admin_message_id`: ID of admin message for deletion
-
-### responses table
-
-- `id`: Primary key
-- `request_id`: Foreign key to requests
-- `question_id`: Question identifier
-- `answer`: User's answer
+- `user_explanation`: User's explanation text
 
 ## Troubleshooting
 
@@ -169,6 +184,12 @@ Change `REQUEST_TIMEOUT_HOURS` in your environment variables to modify the auto-
 - The database file is created automatically
 - On Render, it's stored in the `/data` directory
 - Free tier has limited storage
+
+### Import errors
+
+- Make sure you're running from the project root directory
+- Use `python src/bot.py` to run the bot
+- Check that all `__init__.py` files are present in the src directories
 
 ## Security Notes
 
