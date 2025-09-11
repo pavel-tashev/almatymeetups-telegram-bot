@@ -210,8 +210,9 @@ class Database:
     def get_all_active_users(self) -> list[Dict]:
         """Get all active approved users"""
         import logging
+
         logger = logging.getLogger(__name__)
-        
+
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
@@ -223,31 +224,33 @@ class Database:
 
         rows = cursor.fetchall()
         logger.info(f"Database query returned {len(rows)} rows")
-        
+
         # Also check total users in table
         cursor.execute("SELECT COUNT(*) FROM users")
         total_count = cursor.fetchone()[0]
         logger.info(f"Total users in database: {total_count}")
-        
+
         # Check active vs inactive
         cursor.execute("SELECT COUNT(*) FROM users WHERE is_active = 1")
         active_count = cursor.fetchone()[0]
         logger.info(f"Active users in database: {active_count}")
-        
+
         conn.close()
 
         users = []
         for row in rows:
-            users.append({
-                "id": row[0],
-                "user_id": row[1],
-                "username": row[2],
-                "first_name": row[3],
-                "last_name": row[4],
-                "approved_at": row[5],
-                "last_contacted_at": row[6],
-                "is_active": bool(row[7]),
-            })
+            users.append(
+                {
+                    "id": row[0],
+                    "user_id": row[1],
+                    "username": row[2],
+                    "first_name": row[3],
+                    "last_name": row[4],
+                    "approved_at": row[5],
+                    "last_contacted_at": row[6],
+                    "is_active": bool(row[7]),
+                }
+            )
         return users
 
     def get_user_by_id(self, user_id: int) -> Optional[Dict]:
