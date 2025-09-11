@@ -15,6 +15,7 @@ from telegram.request import HTTPXRequest
 
 from config import ADMIN_CHAT_ID, BOT_TOKEN, TARGET_GROUP_ID
 from database import Database
+from questions import QUESTIONS
 from texts import (
     ADMIN_DECLINED_MSG,
     APPROVE_BUTTON,
@@ -25,7 +26,6 @@ from texts import (
     ERROR_APPROVE_FAILED,
     ERROR_DECLINE_FAILED,
     ERROR_INVITE_LINK_FAILED,
-    OPTIONS_CONFIG,
     PENDING_REQUEST_MSG,
     REJECT_BUTTON,
     REQUEST_NOT_FOUND,
@@ -145,7 +145,7 @@ class TelegramBot:
 
         # Dynamically create keyboard from configuration
         keyboard = []
-        for option_key, option_config in OPTIONS_CONFIG.items():
+        for option_key, option_config in QUESTIONS.items():
             keyboard.append(
                 [
                     InlineKeyboardButton(
@@ -179,8 +179,8 @@ class TelegramBot:
         context.user_data["selected_option"] = option
 
         # Get question from configuration
-        if option in OPTIONS_CONFIG:
-            question_text = OPTIONS_CONFIG[option]["question"]
+        if option in QUESTIONS:
+            question_text = QUESTIONS[option]["question"]
         else:
             # Fallback for unknown options
             question_text = "Please provide more details:"
@@ -262,10 +262,10 @@ class TelegramBot:
         answer = context.user_data.get("answer", "")
 
         # Create the full explanation using configuration
-        if selected_option in OPTIONS_CONFIG:
-            explanation = OPTIONS_CONFIG[selected_option][
-                "explanation_template"
-            ].format(answer=answer)
+        if selected_option in QUESTIONS:
+            explanation = QUESTIONS[selected_option]["explanation_template"].format(
+                answer=answer
+            )
         else:
             # Fallback for unknown options
             explanation = f"Unknown option '{selected_option}': {answer}"
