@@ -1,5 +1,4 @@
-import os
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -16,7 +15,7 @@ from telegram.ext import (
 )
 from telegram.request import HTTPXRequest
 
-from config import ADMIN_CHAT_ID, BOT_TOKEN, REQUEST_TIMEOUT_HOURS, TARGET_GROUP_ID
+from config import ADMIN_CHAT_ID, BOT_TOKEN, TARGET_GROUP_ID
 from database import Database
 from texts import (
     BACK_BUTTON,
@@ -34,7 +33,6 @@ from texts import (
     WELCOME_TEXT,
     admin_approved_added,
     admin_approved_link_sent,
-    admin_declined,
     complete_prompt,
     user_approved_with_link,
 )
@@ -494,25 +492,19 @@ class TelegramBot:
         return ConversationHandler.END
 
     async def check_expired_requests(self):
-        """Check for expired requests and auto-decline them"""
+        """Check for expired requests and mark them expired + notify user"""
         expired_requests = db.get_expired_requests()
 
         for request in expired_requests:
+            # Update request status only; no server-side decline needed for bot-link flow
+            db.update_request_status(request["id"], "expired")
+
+            # Notify user
             try:
-                # Decline the chat join request
-                await self.application.bot.decline_chat_join_request(
-                    chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
-                )
-
-                # Update request status
-                db.update_request_status(request["id"], "expired")
-
-                # Notify user
                 await self.application.bot.send_message(
                     chat_id=request["user_id"],
                     text="⏰ Your application has expired and been automatically declined. You can apply again anytime.",
                 )
-
             except Exception:
                 pass
 
