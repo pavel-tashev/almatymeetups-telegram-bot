@@ -211,6 +211,36 @@ class TelegramBot:
         await self.send_welcome_message(update, context)
         return WAITING_FOR_EXPLANATION
 
+    async def handle_explanation(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle user's free-text explanation from the welcome screen"""
+        user = update.effective_user
+        explanation_text = update.message.text
+
+        logger.info(
+            f"User {user.id} provided free-text explanation from welcome: {explanation_text}"
+        )
+
+        # Treat as 'other' path; store selection and answer
+        context.user_data["selected_option"] = "other"
+        context.user_data["answer"] = explanation_text
+
+        # Show Complete Application button (same as after answering a follow-up)
+        complete_text = (
+            f"✅ Thank you for your answer!\n\n"
+            f"Your response: {explanation_text}\n\n"
+            f"Click the button below to complete your application:"
+        )
+
+        keyboard = [
+            [InlineKeyboardButton("✅ Complete Application", callback_data="complete")],
+            [InlineKeyboardButton("⬅️ Back", callback_data="back")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await update.message.reply_text(text=complete_text, reply_markup=reply_markup)
+
+        return WAITING_FOR_ANSWER
+
     async def handle_answer(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle user's answer to the follow-up question"""
         user = update.effective_user
