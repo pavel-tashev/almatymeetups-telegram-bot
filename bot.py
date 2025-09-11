@@ -20,6 +20,24 @@ from telegram.request import HTTPXRequest
 
 from config import ADMIN_CHAT_ID, BOT_TOKEN, REQUEST_TIMEOUT_HOURS, TARGET_GROUP_ID
 from database import Database
+from texts import (
+    BACK_BUTTON,
+    COMPLETE_BUTTON,
+    OPTION_COUCHSURFING,
+    OPTION_INVITED,
+    OPTION_OTHER,
+    QUESTION_COUCHSURFING,
+    QUESTION_INVITED,
+    QUESTION_OTHER,
+    USER_APPROVED_DM,
+    WELCOME_TEXT,
+    admin_approved_added,
+    admin_approved_link_sent,
+    admin_declined,
+    complete_prompt,
+    group_verification_text,
+    user_approved_with_link,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -149,23 +167,16 @@ class TelegramBot:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
         """Send the welcome message with three options"""
-        welcome_text = (
-            "👋 Welcome to our community!\n\n"
-            "To join our group, please tell us how you found out about us:"
-        )
+        welcome_text = WELCOME_TEXT
 
         keyboard = [
             [
                 InlineKeyboardButton(
-                    "🏠 Couchsurfing", callback_data="option_couchsurfing"
+                    OPTION_COUCHSURFING, callback_data="option_couchsurfing"
                 )
             ],
-            [
-                InlineKeyboardButton(
-                    "👥 Someone invited me", callback_data="option_invited"
-                )
-            ],
-            [InlineKeyboardButton("🔍 Other", callback_data="option_other")],
+            [InlineKeyboardButton(OPTION_INVITED, callback_data="option_invited")],
+            [InlineKeyboardButton(OPTION_OTHER, callback_data="option_other")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -193,15 +204,13 @@ class TelegramBot:
 
         # Ask the appropriate follow-up question
         if option == "couchsurfing":
-            question_text = "What's your Couchsurfing account?"
+            question_text = QUESTION_COUCHSURFING
         elif option == "invited":
-            question_text = "What is the Telegram username of the person who invited you to the group?"
+            question_text = QUESTION_INVITED
         else:  # other
-            question_text = (
-                "How you found out about the group, please let us know your name?"
-            )
+            question_text = QUESTION_OTHER
 
-        keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back")]]
+        keyboard = [[InlineKeyboardButton(BACK_BUTTON, callback_data="back")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         await query.edit_message_text(text=question_text, reply_markup=reply_markup)
@@ -265,15 +274,11 @@ class TelegramBot:
         context.user_data["answer"] = answer
 
         # Show Complete Application button
-        complete_text = (
-            f"✅ Thank you for your answer!\n\n"
-            f"Your response: {answer}\n\n"
-            f"Click the button below to complete your application:"
-        )
+        complete_text = complete_prompt(answer)
 
         keyboard = [
-            [InlineKeyboardButton("✅ Complete Application", callback_data="complete")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="back")],
+            [InlineKeyboardButton(COMPLETE_BUTTON, callback_data="complete")],
+            [InlineKeyboardButton(BACK_BUTTON, callback_data="back")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -441,13 +446,15 @@ class TelegramBot:
                 )
 
                 # Update request status
-                db.update_request_status(request_id, "approved", query.message.message_id)
+                db.update_request_status(
+                    request_id, "approved", query.message.message_id
+                )
 
                 # Delete the admin message and send confirmation
                 await query.delete_message()
                 await context.bot.send_message(
                     chat_id=ADMIN_CHAT_ID,
-                    text=f"✅ **{request['first_name']}** has been **approved** and added to the group!",
+                    text=admin_approved_added(request["first_name"]),
                     parse_mode="Markdown",
                 )
 
@@ -455,17 +462,21 @@ class TelegramBot:
                 try:
                     await context.bot.send_message(
                         chat_id=request["user_id"],
-                        text="🎉 Congratulations! Your application has been approved. Welcome to our community!",
+                        text=USER_APPROVED_DM,
                     )
                 except Exception as notify_err:
-                    logger.error(f"Failed to notify user {request['user_id']}: {notify_err}")
+                    logger.error(
+                        f"Failed to notify user {request['user_id']}: {notify_err}"
+                    )
                 return
 
             except TelegramError as e:
                 # If no join request exists, generate one-time invite link and DM it
-                if "Hide_requester_missing" in str(e) or "CHAT_JOIN_REQUEST_NOT_FOUND" in str(e):
+                if "Hide_requester_missing" in str(
+                    e
+                ) or "CHAT_JOIN_REQUEST_NOT_FOUND" in str(e):
                     logger.info(
-                        f"No join request found for user {request['user_id']}, generating single-use invite link"
+                        f"No join request found for user {request['user_id']}, generating a single-use invite link"
                     )
                     try:
                         invite = await context.bot.create_chat_invite_link(
@@ -474,31 +485,31 @@ class TelegramBot:
                             member_limit=1,
                             creates_join_request=False,
                         )
-                        invite_link = getattr(invite, "invite_link", None) or invite["invite_link"]
+                        invite_link = (
+                            getattr(invite, "invite_link", None)
+                            or invite["invite_link"]
+                        )
                         logger.info(
-                            f"Generated single-use invite link for user {request['user_id']}"
+                            f"Generated a single-use invite link for user {request['user_id']}"
                         )
 
                         # Update request status
-                        db.update_request_status(request_id, "approved", query.message.message_id)
+                        db.update_request_status(
+                            request_id, "approved", query.message.message_id
+                        )
 
                         # Delete admin message and announce
                         await query.delete_message()
                         await context.bot.send_message(
                             chat_id=ADMIN_CHAT_ID,
-                            text=f"✅ **{request['first_name']}** approved. Single-use invite sent via DM.",
+                            text=admin_approved_link_sent(request["first_name"]),
                             parse_mode="Markdown",
                         )
 
                         # DM the user the invite link
                         await context.bot.send_message(
                             chat_id=request["user_id"],
-                            text=(
-                                "🎉 You have been approved!\n\n"
-                                "Tap this one-time invite link to join the group:\n"
-                                f"{invite_link}\n\n"
-                                "Note: This link works once and expires after first use."
-                            ),
+                            text=user_approved_with_link(invite_link),
                         )
                         return
 
