@@ -1,7 +1,6 @@
-import json
 import sqlite3
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from datetime import datetime
+from typing import Dict, Optional
 
 from config import DATABASE_URL
 
@@ -31,19 +30,6 @@ class Database:
                 admin_message_id INTEGER,
                 user_explanation TEXT,
                 UNIQUE(user_id)
-            )
-        """
-        )
-
-        # Create responses table
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS responses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                request_id INTEGER NOT NULL,
-                question_id TEXT NOT NULL,
-                answer TEXT NOT NULL,
-                FOREIGN KEY (request_id) REFERENCES requests (id)
             )
         """
         )
@@ -149,76 +135,6 @@ class Database:
 
         conn.commit()
         conn.close()
-
-    def add_response(self, request_id: int, question_id: str, answer: str):
-        """Add a response to a request"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        cursor.execute(
-            """
-            INSERT INTO responses (request_id, question_id, answer)
-            VALUES (?, ?, ?)
-        """,
-            (request_id, question_id, answer),
-        )
-
-        conn.commit()
-        conn.close()
-
-    def get_responses(self, request_id: int) -> List[Dict]:
-        """Get all responses for a request"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        cursor.execute(
-            """
-            SELECT question_id, answer FROM responses WHERE request_id = ?
-        """,
-            (request_id,),
-        )
-
-        responses = [
-            {"question_id": row[0], "answer": row[1]} for row in cursor.fetchall()
-        ]
-        conn.close()
-
-        return responses
-
-    def get_expired_requests(self) -> List[Dict]:
-        """Get requests that have expired (older than timeout period)"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        # Calculate the cutoff time
-        cutoff_time = datetime.now() - timedelta(hours=24)
-
-        cursor.execute(
-            """
-            SELECT * FROM requests 
-            WHERE status = 'pending' AND created_at < ?
-        """,
-            (cutoff_time,),
-        )
-
-        rows = cursor.fetchall()
-        conn.close()
-
-        return [
-            {
-                "id": row[0],
-                "user_id": row[1],
-                "username": row[2],
-                "first_name": row[3],
-                "last_name": row[4],
-                "status": row[5],
-                "created_at": row[6],
-                "approved_at": row[7],
-                "admin_message_id": row[8],
-                "user_explanation": row[9] if len(row) > 9 else None,
-            }
-            for row in rows
-        ]
 
     def get_request_by_id(self, request_id: int) -> Optional[Dict]:
         """Get a request by its ID"""
