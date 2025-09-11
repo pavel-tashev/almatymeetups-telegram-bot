@@ -217,8 +217,15 @@ class ApplicationHandlers:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
         """Handle user's free-text explanation from the welcome screen"""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         user = update.effective_user
         explanation_text = update.message.text
+        logger.info(
+            f"Handle explanation from user {user.id}: {explanation_text[:50]}..."
+        )
 
         # Treat as 'other' path; store selection and answer
         context.user_data["selected_option"] = "other"
@@ -236,12 +243,22 @@ class ApplicationHandlers:
         await update.message.reply_text(
             text=complete_text, reply_markup=reply_markup, parse_mode="Markdown"
         )
+        logger.info(f"Complete application prompt sent to user {user.id}")
+
+        return WAITING_FOR_ANSWER
 
     async def handle_answer(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle user's answer to the follow-up question"""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         user = update.effective_user
         answer = update.message.text
         selected_option = context.user_data.get("selected_option", "unknown")
+        logger.info(
+            f"Handle answer from user {user.id} for option {selected_option}: {answer[:50]}..."
+        )
 
         # Store the answer
         context.user_data["answer"] = answer
@@ -258,6 +275,9 @@ class ApplicationHandlers:
         await update.message.reply_text(
             text=complete_text, reply_markup=reply_markup, parse_mode="Markdown"
         )
+        logger.info(f"Complete application prompt sent to user {user.id}")
+
+        return WAITING_FOR_ANSWER
 
     async def handle_complete_application(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
