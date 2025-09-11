@@ -47,6 +47,8 @@ USER_APPROVED_DM = (
     "🎉 Congratulations! Your application has been approved. Welcome to our community!"
 )
 
+USER_DECLINED_DM = "❌ Unfortunately, your application has been declined. Thank you for your interest in our community."
+
 
 def user_approved_with_link(invite_link: str) -> str:
     return (
@@ -54,4 +56,36 @@ def user_approved_with_link(invite_link: str) -> str:
         "Tap this one-time invite link to join the group:\n"
         f"{invite_link}\n\n"
         "Note: This link works once and expires after first use."
+    )
+
+
+# Start/pending messaging
+PENDING_REQUEST_MSG = (
+    "⏳ You already have a pending request. Please wait for admin approval."
+)
+
+# Post-submit message to user
+SUBMITTED_MSG = (
+    "✅ Your application has been submitted! We'll review it and get back to you soon."
+)
+
+# Admin application message
+
+
+def admin_application_text(
+    first_name: str,
+    username: str | None,
+    user_id: int,
+    when: str,
+    request_id: int,
+    explanation: str,
+) -> str:
+    handle = f" (@{username})" if username else ""
+    return (
+        "📝 **New Join Request**\n\n"
+        f"👤 **User:** {first_name}{handle}\n"
+        f"🆔 **User ID:** `{user_id}`\n"
+        f"📅 **Date:** {when}\n\n"
+        f"💬 **Explanation:**\n{explanation}\n\n"
+        f"⏰ **Request ID:** {request_id}"
     )

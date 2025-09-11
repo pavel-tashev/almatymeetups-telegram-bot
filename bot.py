@@ -4,39 +4,24 @@ from datetime import datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import (BotCommand, InlineKeyboardButton, InlineKeyboardMarkup,
+                      Update)
 from telegram.error import TelegramError
-from telegram.ext import (
-    Application,
-    CallbackQueryHandler,
-    ChatJoinRequestHandler,
-    CommandHandler,
-    ContextTypes,
-    ConversationHandler,
-    MessageHandler,
-    filters,
-)
+from telegram.ext import (Application, CallbackQueryHandler,
+                          ChatJoinRequestHandler, CommandHandler, ContextTypes,
+                          ConversationHandler, MessageHandler, filters)
 from telegram.request import HTTPXRequest
 
-from config import ADMIN_CHAT_ID, BOT_TOKEN, REQUEST_TIMEOUT_HOURS, TARGET_GROUP_ID
+from config import (ADMIN_CHAT_ID, BOT_TOKEN, REQUEST_TIMEOUT_HOURS,
+                    TARGET_GROUP_ID)
 from database import Database
-from texts import (
-    BACK_BUTTON,
-    COMPLETE_BUTTON,
-    OPTION_COUCHSURFING,
-    OPTION_INVITED,
-    OPTION_OTHER,
-    QUESTION_COUCHSURFING,
-    QUESTION_INVITED,
-    QUESTION_OTHER,
-    USER_APPROVED_DM,
-    WELCOME_TEXT,
-    admin_approved_added,
-    admin_approved_link_sent,
-    admin_declined,
-    complete_prompt,
-    user_approved_with_link,
-)
+from texts import (BACK_BUTTON, COMPLETE_BUTTON, OPTION_COUCHSURFING,
+                   OPTION_INVITED, OPTION_OTHER, PENDING_REQUEST_MSG,
+                   QUESTION_COUCHSURFING, QUESTION_INVITED, QUESTION_OTHER,
+                   SUBMITTED_MSG, USER_APPROVED_DM, USER_DECLINED_DM,
+                   WELCOME_TEXT, admin_approved_added,
+                   admin_approved_link_sent, admin_declined, complete_prompt,
+                   user_approved_with_link)
 
 # Configure logging
 logging.basicConfig(
@@ -141,9 +126,7 @@ class TelegramBot:
         existing_request = db.get_request(user.id)
         if existing_request and existing_request["status"] == "pending":
             logger.info(f"User {user.id} already has pending request")
-            await update.message.reply_text(
-                "⏳ You already have a pending request. Please wait for admin approval."
-            )
+            await update.message.reply_text(PENDING_REQUEST_MSG)
             return ConversationHandler.END
 
         # Create new request
@@ -313,9 +296,7 @@ class TelegramBot:
         # Submit to admins
         await self.submit_to_admins(update, context, request_id, explanation)
 
-        await query.edit_message_text(
-            text="✅ Your application has been submitted! We'll review it and get back to you soon."
-        )
+        await query.edit_message_text(text=SUBMITTED_MSG)
 
         return ConversationHandler.END
 
@@ -333,14 +314,13 @@ class TelegramBot:
         )
 
         # Create admin message
-        admin_text = (
-            f"📝 **New Join Request**\n\n"
-            f"👤 **User:** {user.first_name}"
-            f"{f' (@{user.username})' if user.username else ''}\n"
-            f"🆔 **User ID:** `{user.id}`\n"
-            f"📅 **Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-            f"💬 **Explanation:**\n{explanation}\n\n"
-            f"⏰ **Request ID:** {request_id}"
+        admin_text = admin_application_text(
+            first_name=user.first_name,
+            username=user.username,
+            user_id=user.id,
+            when=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            request_id=request_id,
+            explanation=explanation,
         )
 
         keyboard = [
@@ -580,7 +560,7 @@ class TelegramBot:
             try:
                 await context.bot.send_message(
                     chat_id=request["user_id"],
-                    text="❌ Unfortunately, your application has been declined. Thank you for your interest in our community.",
+                    text=USER_DECLINED_DM,
                 )
             except Exception as e:
                 logger.error(f"Failed to notify user {request['user_id']}: {e}")
