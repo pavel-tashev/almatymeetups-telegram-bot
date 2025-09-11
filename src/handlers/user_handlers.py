@@ -31,7 +31,7 @@ class ApplicationHandlers:
         """Handle the /start command"""
         import logging
 
-        from telegram.error import NetworkError, TimedOut
+        from telegram.error import Forbidden, NetworkError, TimedOut
 
         logger = logging.getLogger(__name__)
         user = update.effective_user
@@ -49,10 +49,8 @@ class ApplicationHandlers:
             try:
                 await update.message.reply_text(PENDING_REQUEST_MSG)
                 logger.info(f"Pending message sent successfully to user {user.id}")
-            except (TimedOut, NetworkError) as e:
-                logger.error(
-                    f"Network error sending pending message to user {user.id}: {e}"
-                )
+            except (TimedOut, NetworkError, Forbidden) as e:
+                logger.error(f"Error sending pending message to user {user.id}: {e}")
             return ConversationHandler.END
 
         # Create new request
@@ -74,21 +72,17 @@ class ApplicationHandlers:
             await self.send_welcome_message(update, context)
             logger.info(f"Welcome message sent successfully to user {user.id}")
             return WAITING_FOR_EXPLANATION
-        except Exception as e:
+        except (TimedOut, NetworkError, Forbidden) as e:
             logger.error(f"Error in start command for user {user.id}: {e}")
+            # Don't try to send fallback message if user blocked the bot
+            if isinstance(e, Forbidden):
+                logger.error(f"User {user.id} has blocked the bot")
+            return ConversationHandler.END
+        except Exception as e:
+            logger.error(f"Unexpected error in start command for user {user.id}: {e}")
             import traceback
 
             logger.error(f"Full traceback: {traceback.format_exc()}")
-            # Try to send a simple fallback message
-            try:
-                await update.message.reply_text(
-                    "Welcome! Please try again in a moment."
-                )
-                logger.info(f"Fallback message sent to user {user.id}")
-            except Exception as fallback_error:
-                logger.error(
-                    f"Fallback message also failed for user {user.id}: {fallback_error}"
-                )
             return ConversationHandler.END
 
     async def send_welcome_message(
