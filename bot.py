@@ -16,7 +16,10 @@ from telegram.request import HTTPXRequest
 from config import ADMIN_CHAT_ID, BOT_TOKEN, TARGET_GROUP_ID
 from database import Database
 from texts import (
+    APPROVE_BUTTON,
     BACK_BUTTON,
+    CANCELLED_MSG,
+    COMMAND_START_DESC,
     COMPLETE_BUTTON,
     OPTION_COUCHSURFING,
     OPTION_INVITED,
@@ -25,6 +28,8 @@ from texts import (
     QUESTION_COUCHSURFING,
     QUESTION_INVITED,
     QUESTION_OTHER,
+    REJECT_BUTTON,
+    REQUEST_NOT_FOUND,
     SUBMITTED_MSG,
     USER_APPROVED_DM,
     USER_DECLINED_DM,
@@ -55,7 +60,6 @@ class TelegramBot:
             Application.builder().token(BOT_TOKEN).request(http_request).build()
         )
         self.setup_handlers()
-        # Auto-rejection disabled; no scheduler setup
 
     def setup_handlers(self):
         """Setup all bot handlers"""
@@ -103,15 +107,11 @@ class TelegramBot:
 
     async def set_bot_commands(self, application):
         """Set bot commands menu"""
-        commands = [
-            BotCommand("start", "Start the application process"),
-        ]
+        commands = [BotCommand("start", COMMAND_START_DESC)]
         try:
             await application.bot.set_my_commands(commands)
         except Exception:
             pass
-
-    
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle the /start command"""
@@ -301,10 +301,10 @@ class TelegramBot:
         keyboard = [
             [
                 InlineKeyboardButton(
-                    "✅ Approve", callback_data=f"approve_{request_id}"
+                    APPROVE_BUTTON, callback_data=f"approve_{request_id}"
                 ),
                 InlineKeyboardButton(
-                    "❌ Reject", callback_data=f"decline_{request_id}"
+                    REJECT_BUTTON, callback_data=f"decline_{request_id}"
                 ),
             ]
         ]
@@ -331,7 +331,7 @@ class TelegramBot:
 
         request = db.get_request_by_id(request_id)
         if not request:
-            await query.edit_message_text("❌ Request not found.")
+            await query.edit_message_text(REQUEST_NOT_FOUND)
             return
 
         try:
@@ -426,7 +426,7 @@ class TelegramBot:
 
         request = db.get_request_by_id(request_id)
         if not request:
-            await query.edit_message_text("❌ Request not found.")
+            await query.edit_message_text(REQUEST_NOT_FOUND)
             return
 
         try:
@@ -476,12 +476,8 @@ class TelegramBot:
         """Cancel the application process"""
         user = update.effective_user
 
-        await update.message.reply_text(
-            "❌ Application cancelled. You can start again anytime with /start"
-        )
+        await update.message.reply_text(CANCELLED_MSG)
         return ConversationHandler.END
-
-    
 
     async def run(self):
         """Run the bot"""

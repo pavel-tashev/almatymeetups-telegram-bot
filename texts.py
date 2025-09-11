@@ -19,6 +19,11 @@ QUESTION_OTHER = "How did you find out about the group? Please provide more deta
 
 BACK_BUTTON = "⬅️ Back"
 COMPLETE_BUTTON = "✅ Complete Application"
+APPROVE_BUTTON = "✅ Approve"
+REJECT_BUTTON = "❌ Reject"
+COMMAND_START_DESC = "Start the application process"
+REQUEST_NOT_FOUND = "❌ Request not found."
+CANCELLED_MSG = "❌ Application cancelled. You can start again anytime with /start"
 
 
 def complete_prompt(answer: str) -> str:
