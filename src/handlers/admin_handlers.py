@@ -268,6 +268,16 @@ class AdminHandlers:
         # Get all active users
         users = db.get_all_active_users()
 
+        # Debug logging
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info(f"Stats command - Found {len(users)} active users")
+        if users:
+            logger.info(f"First user: {users[0]}")
+        else:
+            logger.warning("No active users found in database")
+
         if not users:
             await update.message.reply_text(
                 "📊 **User Statistics**\n\n❌ No approved users found."
@@ -281,10 +291,11 @@ class AdminHandlers:
 
         # Get recent approvals (last 7 days)
         from datetime import datetime, timedelta
+
         import pytz
 
         # Use Almaty timezone for consistent date calculations
-        almaty_tz = pytz.timezone('Asia/Almaty')
+        almaty_tz = pytz.timezone("Asia/Almaty")
         week_ago = datetime.now(almaty_tz) - timedelta(days=7)
         recent_users = len(
             [
@@ -316,9 +327,7 @@ class AdminHandlers:
                 "🔧 **Admin Commands**\n\n"
                 "📊 `/stats` - View user statistics\n"
                 "📢 `/broadcast <message>` - Send message to all approved users\n"
-                "❓ `/help` - Show this help message\n\n"
-                "💡 **Note:** As an admin, you don't need to use `/start` for approval requests. "
-                "You'll receive approval requests automatically in your admin chat."
+                "❓ `/help` - Show this help message"
             )
         else:
             help_text = (
