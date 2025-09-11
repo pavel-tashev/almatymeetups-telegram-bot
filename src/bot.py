@@ -86,10 +86,14 @@ class TelegramBot:
             self.admin_handlers.decline_request, pattern="^decline_"
         )
 
+        # Add a general callback handler to catch unhandled callbacks
+        general_callback_handler = CallbackQueryHandler(self.handle_general_callback)
+
         # Add handlers
         self.application.add_handler(main_conversation)
         self.application.add_handler(approve_handler)
         self.application.add_handler(decline_handler)
+        self.application.add_handler(general_callback_handler)
 
         # Set bot commands
         self.application.post_init = self.set_bot_commands
@@ -104,6 +108,22 @@ class TelegramBot:
             await application.bot.set_my_commands(commands)
         except Exception:
             pass
+
+    async def handle_general_callback(self, update, context):
+        """Handle any callback queries that weren't caught by other handlers"""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        query = update.callback_query
+        user = query.from_user
+        logger.warning(f"Unhandled callback from user {user.id}: {query.data}")
+
+        # Answer the callback to remove the loading state
+        await query.answer("This action is not available right now.")
+
+        # Log the callback data for debugging
+        logger.warning(f"Callback data: {query.data}, User: {user.id}")
 
     async def error_handler(self, update, context):
         """Handle errors that occur during bot operation"""

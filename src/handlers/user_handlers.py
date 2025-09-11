@@ -162,10 +162,18 @@ class ApplicationHandlers:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
         """Handle when user selects an option"""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         query = update.callback_query
+        user = query.from_user
+        logger.info(f"Option selection callback from user {user.id}: {query.data}")
+
         await query.answer()
 
         option = query.data.split("_")[1]
+        logger.info(f"Selected option: {option}")
 
         # Store the selected option
         context.user_data["selected_option"] = option
@@ -173,24 +181,37 @@ class ApplicationHandlers:
         # Get question from configuration
         if option in QUESTIONS:
             question_text = QUESTIONS[option]["question"]
+            logger.info(f"Using configured question for {option}")
         else:
             # Fallback for unknown options
             question_text = "Please provide more details:"
+            logger.warning(f"Unknown option {option}, using fallback question")
 
         keyboard = [[InlineKeyboardButton(BACK_BUTTON, callback_data="back")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
+        logger.info(f"Sending question to user {user.id}: {question_text[:50]}...")
         await query.edit_message_text(text=question_text, reply_markup=reply_markup)
+        logger.info(f"Question sent successfully to user {user.id}")
 
     async def handle_back_button(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
         """Handle when user clicks the Back button"""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         query = update.callback_query
+        user = query.from_user
+        logger.info(f"Back button callback from user {user.id}: {query.data}")
+
         await query.answer()
 
         # Return to welcome message
+        logger.info(f"Returning to welcome message for user {user.id}")
         await self.send_welcome_message(update, context)
+        logger.info(f"Welcome message sent to user {user.id} via back button")
 
     async def handle_explanation(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -242,30 +263,50 @@ class ApplicationHandlers:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
         """Handle when user completes their application"""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         query = update.callback_query
+        user = query.from_user
+        logger.info(f"Complete application callback from user {user.id}: {query.data}")
+
         await query.answer()
 
-        user = query.from_user
         request_id = context.user_data["request_id"]
         selected_option = context.user_data.get("selected_option", "unknown")
         answer = context.user_data.get("answer", "")
+
+        logger.info(
+            f"Completing application for user {user.id}, request {request_id}, option: {selected_option}"
+        )
 
         # Create the full explanation using configuration
         if selected_option in QUESTIONS:
             explanation = QUESTIONS[selected_option]["explanation_template"].format(
                 answer=answer
             )
+            logger.info(f"Using configured explanation template for {selected_option}")
         else:
             # Fallback for unknown options
             explanation = f"Unknown option '{selected_option}': {answer}"
+            logger.warning(
+                f"Unknown option {selected_option}, using fallback explanation"
+            )
+
+        logger.info(f"Generated explanation: {explanation[:100]}...")
 
         # Save explanation to database
         db.update_user_explanation(request_id, explanation)
+        logger.info(f"Saved explanation to database for request {request_id}")
 
         # Submit to admins
+        logger.info(f"Submitting to admins for user {user.id}")
         await self.submit_to_admins(update, context, request_id, explanation)
+        logger.info(f"Submitted to admins successfully for user {user.id}")
 
         await query.edit_message_text(text=SUBMITTED_MSG)
+        logger.info(f"Application completed successfully for user {user.id}")
 
         return ConversationHandler.END
 
