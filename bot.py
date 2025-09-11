@@ -6,7 +6,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import TelegramError
-from telegram.request import HTTPXRequest
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -17,6 +16,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+from telegram.request import HTTPXRequest
 
 from config import ADMIN_CHAT_ID, BOT_TOKEN, REQUEST_TIMEOUT_HOURS, TARGET_GROUP_ID
 from database import Database
@@ -448,8 +448,8 @@ class TelegramBot:
                         f"No join request found for user {request['user_id']}, trying to add directly"
                     )
                     try:
-                        await context.bot.add_chat_member(
-                            chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
+                        await context.bot.add_chat_members(
+                            chat_id=TARGET_GROUP_ID, user_ids=[request["user_id"]]
                         )
                         logger.info(
                             f"Successfully added user {request['user_id']} directly to group"
