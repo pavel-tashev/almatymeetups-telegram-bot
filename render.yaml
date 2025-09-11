@@ -11,7 +11,5 @@ services:
         sync: false
       - key: TARGET_GROUP_ID
         sync: false
-      - key: REQUEST_TIMEOUT_HOURS
-        value: 24
       - key: DATABASE_URL
         value: sqlite:///data/bot_database.db

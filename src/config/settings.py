@@ -8,7 +8,6 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", 0))
 TARGET_GROUP_ID = int(os.getenv("TARGET_GROUP_ID", 0))
-REQUEST_TIMEOUT_HOURS = int(os.getenv("REQUEST_TIMEOUT_HOURS", 24))
 
 # Database
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///bot_database.db")
