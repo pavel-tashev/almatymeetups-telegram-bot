@@ -48,6 +48,9 @@ class TelegramBot:
         """Setup all bot handlers"""
         # Start command handler
         start_handler = CommandHandler("start", self.app_handlers.start_command)
+        
+        # Add a simple test handler to see if any messages are being received
+        test_handler = MessageHandler(filters.ALL, self.test_message_handler)
 
         # Main conversation handler
         main_conversation = ConversationHandler(
@@ -101,6 +104,7 @@ class TelegramBot:
         self.application.add_handler(approve_handler)
         self.application.add_handler(decline_handler)
         self.application.add_handler(general_callback_handler)
+        self.application.add_handler(test_handler)
 
         # Set bot commands
         self.application.post_init = self.set_bot_commands
@@ -115,6 +119,22 @@ class TelegramBot:
             await application.bot.set_my_commands(commands)
         except Exception:
             pass
+
+    async def test_message_handler(self, update, context):
+        """Test handler to see if any messages are being received"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        if update.message:
+            user = update.message.from_user
+            text = update.message.text
+            logger.info(f"TEST: Received message from user {user.id}: '{text}'")
+        elif update.callback_query:
+            user = update.callback_query.from_user
+            data = update.callback_query.data
+            logger.info(f"TEST: Received callback from user {user.id}: '{data}'")
+        else:
+            logger.info(f"TEST: Received update: {update}")
 
     async def handle_general_callback(self, update, context):
         """Handle any callback queries that weren't caught by other handlers"""
