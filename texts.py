@@ -1,3 +1,14 @@
+# =============================================================================
+# BOT CONFIGURATION
+# =============================================================================
+
+COMMAND_START_DESC = "Start the application process"
+
+# =============================================================================
+# USER FLOW MESSAGES
+# =============================================================================
+
+# Welcome and initial messages
 WELCOME_TEXT = (
     "👋 Welcome to our `Almaty Meetups`!\n\n"
     "We are a local community of foreigners and locals based in Almaty, Kazakhstan.\n\n"
@@ -5,42 +16,17 @@ WELCOME_TEXT = (
     "To join our group, please tell us how you found out about us:"
 )
 
-# Button labels
-BACK_BUTTON = "⬅️ Back"
-COMPLETE_BUTTON = "✅ Complete Application"
-APPROVE_BUTTON = "✅ Approve"
-REJECT_BUTTON = "❌ Reject"
-COMMAND_START_DESC = "Start the application process"
-REQUEST_NOT_FOUND = "❌ Request not found."
+PENDING_REQUEST_MSG = (
+    "⏳ You already have a pending request. Please wait for admin approval."
+)
+
 CANCELLED_MSG = "❌ Application cancelled. You can start again anytime with /start"
 
-# Error messages
-ERROR_INVITE_LINK_FAILED = "❌ Failed to send invite link to user {user_id}: {error}"
-ERROR_APPROVE_FAILED = "❌ Failed to approve user {user_id}: {error}"
-ERROR_DECLINE_FAILED = "❌ Failed to decline user {user_id}: {error}"
+SUBMITTED_MSG = (
+    "✅ Your application has been submitted! We'll review it and get back to you soon."
+)
 
-# Admin messages
-ADMIN_DECLINED_MSG = "❌ **{first_name}** has been **declined**."
-
-
-def complete_prompt(answer: str) -> str:
-    return (
-        "✅ Thank you for your answer!\n\n"
-        f"Your response: {answer}\n\n"
-        "Click the button below to complete your application:"
-    )
-
-
-# Messages to admins
-def admin_approved_added(first_name: str) -> str:
-    return f"✅ **{first_name}** has been **approved** and added to the group!"
-
-
-def admin_approved_link_sent(first_name: str) -> str:
-    return f"✅ **{first_name}** approved. Single-use invite link has been sent to the user."
-
-
-# DM to user
+# User approval/decline messages
 USER_APPROVED_DM = (
     "🎉 Congratulations! Your application has been approved. Welcome to our community!"
 )
@@ -57,17 +43,31 @@ def user_approved_with_link(invite_link: str) -> str:
     )
 
 
-# Start/pending messaging
-PENDING_REQUEST_MSG = (
-    "⏳ You already have a pending request. Please wait for admin approval."
-)
+# =============================================================================
+# BUTTON LABELS
+# =============================================================================
 
-# Post-submit message to user
-SUBMITTED_MSG = (
-    "✅ Your application has been submitted! We'll review it and get back to you soon."
-)
+BACK_BUTTON = "⬅️ Back"
+COMPLETE_BUTTON = "✅ Complete Application"
+APPROVE_BUTTON = "✅ Approve"
+REJECT_BUTTON = "❌ Reject"
 
-# Admin application message
+# =============================================================================
+# APPLICATION FLOW FUNCTIONS
+# =============================================================================
+
+
+def complete_prompt(answer: str) -> str:
+    return (
+        "✅ Thank you for your answer!\n\n"
+        f"Your response: {answer}\n\n"
+        "Click the button below to complete your application:"
+    )
+
+
+# =============================================================================
+# ADMIN MESSAGES
+# =============================================================================
 
 
 def admin_application_text(
@@ -88,3 +88,23 @@ def admin_application_text(
         f"💬 **Explanation:**\n{explanation}\n\n"
         f"⏰ **Request ID:** {request_id}"
     )
+
+
+def admin_approved_added(first_name: str) -> str:
+    return f"✅ **{first_name}** has been **approved** and added to the group!"
+
+
+def admin_approved_link_sent(first_name: str) -> str:
+    return f"✅ **{first_name}** approved. Single-use invite link has been sent to the user."
+
+
+ADMIN_DECLINED_MSG = "❌ **{first_name}** has been **declined**."
+
+# =============================================================================
+# ERROR MESSAGES
+# =============================================================================
+
+REQUEST_NOT_FOUND = "❌ Request not found."
+ERROR_INVITE_LINK_FAILED = "❌ Failed to send invite link to user {user_id}: {error}"
+ERROR_APPROVE_FAILED = "❌ Failed to approve user {user_id}: {error}"
+ERROR_DECLINE_FAILED = "❌ Failed to decline user {user_id}: {error}"
