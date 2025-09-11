@@ -13,14 +13,14 @@ from telegram.ext import (
 )
 from telegram.request import HTTPXRequest
 
-from handlers.admin_handlers import AdminHandlers
 from config.settings import BOT_TOKEN
-from messages.texts import COMMAND_START_DESC
+from handlers.admin_handlers import AdminHandlers
 from handlers.user_handlers import (
     WAITING_FOR_ANSWER,
     WAITING_FOR_EXPLANATION,
     ApplicationHandlers,
 )
+from messages.texts import COMMAND_START_DESC
 
 
 class TelegramBot:

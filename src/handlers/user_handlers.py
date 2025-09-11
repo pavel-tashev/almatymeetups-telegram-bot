@@ -5,8 +5,8 @@ Bot handlers - separated from main bot class for better organization
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes, ConversationHandler
 
-from database.models import Database
 from config.questions import QUESTIONS
+from database.models import Database
 from messages.texts import (
     BACK_BUTTON,
     COMPLETE_BUTTON,
