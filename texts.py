@@ -107,9 +107,10 @@ def admin_application_text(
     explanation: str,
 ) -> str:
     handle = f" (@{username})" if username else ""
+    user_link = f"tg://user?id={user_id}"
     return (
         "📝 **New Join Request**\n\n"
-        f"👤 **User:** {first_name}{handle}\n"
+        f"👤 **User:** [{first_name}{handle}]({user_link})\n"
         f"🆔 **User ID:** `{user_id}`\n"
         f"📅 **Date:** {when}\n\n"
         f"💬 **Explanation:**\n{explanation}\n\n"
