@@ -34,6 +34,22 @@ class Database:
         """
         )
 
+        # Create users table for approved users
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL UNIQUE,
+                username TEXT,
+                first_name TEXT,
+                last_name TEXT,
+                approved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_contacted_at TIMESTAMP,
+                is_active BOOLEAN DEFAULT 1
+            )
+        """
+        )
+
         conn.commit()
         conn.close()
 
@@ -165,3 +181,114 @@ class Database:
                 "user_explanation": row[9] if len(row) > 9 else None,
             }
         return None
+
+    def add_approved_user(
+        self,
+        user_id: int,
+        username: str = None,
+        first_name: str = None,
+        last_name: str = None,
+    ) -> int:
+        """Add a user to the approved users table"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO users (user_id, username, first_name, last_name, approved_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """,
+            (user_id, username, first_name, last_name),
+        )
+
+        user_db_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        return user_db_id
+
+    def get_all_active_users(self) -> list[Dict]:
+        """Get all active approved users"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT * FROM users WHERE is_active = 1 ORDER BY approved_at DESC
+        """
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        users = []
+        for row in rows:
+            users.append({
+                "id": row[0],
+                "user_id": row[1],
+                "username": row[2],
+                "first_name": row[3],
+                "last_name": row[4],
+                "approved_at": row[5],
+                "last_contacted_at": row[6],
+                "is_active": bool(row[7]),
+            })
+        return users
+
+    def get_user_by_id(self, user_id: int) -> Optional[Dict]:
+        """Get a user by their Telegram user_id"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT * FROM users WHERE user_id = ? AND is_active = 1
+        """,
+            (user_id,),
+        )
+
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            return {
+                "id": row[0],
+                "user_id": row[1],
+                "username": row[2],
+                "first_name": row[3],
+                "last_name": row[4],
+                "approved_at": row[5],
+                "last_contacted_at": row[6],
+                "is_active": bool(row[7]),
+            }
+        return None
+
+    def update_last_contacted(self, user_id: int):
+        """Update the last contacted timestamp for a user"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            UPDATE users SET last_contacted_at = CURRENT_TIMESTAMP WHERE user_id = ?
+        """,
+            (user_id,),
+        )
+
+        conn.commit()
+        conn.close()
+
+    def deactivate_user(self, user_id: int):
+        """Deactivate a user (soft delete)"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            UPDATE users SET is_active = 0 WHERE user_id = ?
+        """,
+            (user_id,),
+        )
+
+        conn.commit()
+        conn.close()

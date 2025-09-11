@@ -96,6 +96,14 @@ class TelegramBot:
             self.admin_handlers.decline_request, pattern="^decline_"
         )
 
+        # Admin broadcast command
+        broadcast_handler = CommandHandler(
+            "broadcast", self.admin_handlers.broadcast_message
+        )
+
+        # Admin stats command
+        stats_handler = CommandHandler("stats", self.admin_handlers.user_stats)
+
         # Add a general callback handler to catch unhandled callbacks
         general_callback_handler = CallbackQueryHandler(self.handle_general_callback)
 
@@ -103,6 +111,8 @@ class TelegramBot:
         self.application.add_handler(main_conversation)
         self.application.add_handler(approve_handler)
         self.application.add_handler(decline_handler)
+        self.application.add_handler(broadcast_handler)
+        self.application.add_handler(stats_handler)
         self.application.add_handler(general_callback_handler)
 
         # Set bot commands
