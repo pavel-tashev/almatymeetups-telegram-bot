@@ -108,18 +108,23 @@ class ApplicationHandlers:
 
         # Dynamically create keyboard from configuration
         keyboard = []
+        logger.info(f"Available questions: {list(QUESTIONS.keys())}")
         for option_key, option_config in QUESTIONS.items():
+            button_text = option_config["button_text"]
+            callback_data = f"option_{option_key}"
+            logger.info(f"Creating button: '{button_text}' -> '{callback_data}'")
             keyboard.append(
                 [
                     InlineKeyboardButton(
-                        option_config["button_text"],
-                        callback_data=f"option_{option_key}",
+                        button_text,
+                        callback_data=callback_data,
                     )
                 ]
             )
 
         reply_markup = InlineKeyboardMarkup(keyboard)
         logger.info(f"Created keyboard with {len(keyboard)} options")
+        logger.info(f"Keyboard rows: {len(keyboard)}")
 
         try:
             if update.callback_query:
@@ -129,9 +134,14 @@ class ApplicationHandlers:
                 )
             else:
                 logger.info(f"Sending new message to user {user.id}")
-                await update.message.reply_text(
+                logger.info(f"Message text: {welcome_text[:100]}...")
+                logger.info(
+                    f"Keyboard structure: {[btn.text for row in keyboard for btn in row]}"
+                )
+                result = await update.message.reply_text(
                     text=welcome_text, reply_markup=reply_markup
                 )
+                logger.info(f"Message sent with ID: {result.message_id}")
             logger.info(f"Welcome message sent successfully to user {user.id}")
         except (TimedOut, NetworkError) as e:
             logger.error(
