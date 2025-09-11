@@ -439,51 +439,84 @@ class TelegramBot:
                 logger.info(
                     f"Successfully approved chat join request for user {request['user_id']}"
                 )
+
+                # Update request status
+                db.update_request_status(request_id, "approved", query.message.message_id)
+
+                # Delete the admin message and send confirmation
+                await query.delete_message()
+                await context.bot.send_message(
+                    chat_id=ADMIN_CHAT_ID,
+                    text=f"✅ **{request['first_name']}** has been **approved** and added to the group!",
+                    parse_mode="Markdown",
+                )
+
+                # Notify user
+                try:
+                    await context.bot.send_message(
+                        chat_id=request["user_id"],
+                        text="🎉 Congratulations! Your application has been approved. Welcome to our community!",
+                    )
+                except Exception as notify_err:
+                    logger.error(f"Failed to notify user {request['user_id']}: {notify_err}")
+                return
+
             except TelegramError as e:
-                # If no join request exists, try to add user directly
-                if "Hide_requester_missing" in str(
-                    e
-                ) or "CHAT_JOIN_REQUEST_NOT_FOUND" in str(e):
+                # If no join request exists, generate one-time invite link and DM it
+                if "Hide_requester_missing" in str(e) or "CHAT_JOIN_REQUEST_NOT_FOUND" in str(e):
                     logger.info(
-                        f"No join request found for user {request['user_id']}, trying to add directly"
+                        f"No join request found for user {request['user_id']}, generating single-use invite link"
                     )
                     try:
-                        await context.bot.invite_chat_member(
-                            chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
+                        invite = await context.bot.create_chat_invite_link(
+                            chat_id=TARGET_GROUP_ID,
+                            name=f"Approval for {request['first_name'] or request['user_id']}",
+                            member_limit=1,
+                            creates_join_request=False,
                         )
+                        invite_link = getattr(invite, "invite_link", None) or invite["invite_link"]
                         logger.info(
-                            f"Successfully invited user {request['user_id']} directly to group"
+                            f"Generated single-use invite link for user {request['user_id']}"
                         )
-                    except TelegramError as add_error:
+
+                        # Update request status
+                        db.update_request_status(request_id, "approved", query.message.message_id)
+
+                        # Delete admin message and announce
+                        await query.delete_message()
+                        await context.bot.send_message(
+                            chat_id=ADMIN_CHAT_ID,
+                            text=f"✅ **{request['first_name']}** approved. Single-use invite sent via DM.",
+                            parse_mode="Markdown",
+                        )
+
+                        # DM the user the invite link
+                        await context.bot.send_message(
+                            chat_id=request["user_id"],
+                            text=(
+                                "🎉 You have been approved!\n\n"
+                                "Tap this one-time invite link to join the group:\n"
+                                f"{invite_link}\n\n"
+                                "Note: This link works once and expires after first use."
+                            ),
+                        )
+                        return
+
+                    except TelegramError as gen_err:
                         logger.error(
-                            f"Failed to invite user {request['user_id']} directly: {add_error}"
+                            f"Failed to generate/send invite link for user {request['user_id']}: {gen_err}"
                         )
-                        raise add_error
+                        await context.bot.send_message(
+                            chat_id=ADMIN_CHAT_ID,
+                            text=f"❌ Failed to send invite link to user {request['user_id']}: {gen_err}",
+                        )
+                        return
                 else:
+                    # Unknown error
                     raise e
 
-            # Update request status
-            db.update_request_status(request_id, "approved", query.message.message_id)
-
-            # Delete the admin message and send confirmation
-            await query.delete_message()
-            await context.bot.send_message(
-                chat_id=ADMIN_CHAT_ID,
-                text=f"✅ **{request['first_name']}** has been **approved** and added to the group!",
-                parse_mode="Markdown",
-            )
-
-            # Notify user
-            try:
-                await context.bot.send_message(
-                    chat_id=request["user_id"],
-                    text="🎉 Congratulations! Your application has been approved. Welcome to our community!",
-                )
-            except Exception as e:
-                logger.error(f"Failed to notify user {request['user_id']}: {e}")
-
         except TelegramError as e:
-            logger.error(f"Failed to approve/add user {request['user_id']}: {e}")
+            logger.error(f"Failed to approve user {request['user_id']}: {e}")
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
                 text=f"❌ Failed to approve user {request['user_id']}: {e}",
