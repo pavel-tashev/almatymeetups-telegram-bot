@@ -2,13 +2,19 @@
 Telegram Bot with HTTP Health Check for Render
 Prevents Render free tier from spinning down by providing a health endpoint
 """
+
 import asyncio
 import logging
+import os
+import sys
 from datetime import datetime
 
 from aiohttp import web
 
-from src.bot import TelegramBot
+# Add src directory to Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+
+from bot import TelegramBot
 
 # Configure logging
 logging.basicConfig(
