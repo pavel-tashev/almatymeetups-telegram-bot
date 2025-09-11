@@ -333,6 +333,7 @@ class AdminHandlers:
             help_text = (
                 "🤖 **Available Commands**\n\n"
                 "🚀 `/start` - Start the application process to join our community\n"
+                "➕ `/add` - Add yourself to our community database\n"
                 "❓ `/help` - Show this help message\n\n"
                 "💡 **Welcome to Almaty Meetups!** We're a local community of foreigners and locals in Almaty, Kazakhstan."
             )

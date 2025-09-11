@@ -107,6 +107,9 @@ class TelegramBot:
         # Help command (shows different options for admin vs regular users)
         help_handler = CommandHandler("help", self.admin_handlers.help_command)
 
+        # Add command for users to add themselves to the user table
+        add_handler = CommandHandler("add", self.app_handlers.add_command)
+
         # Add a general callback handler to catch unhandled callbacks
         general_callback_handler = CallbackQueryHandler(self.handle_general_callback)
 
@@ -117,6 +120,7 @@ class TelegramBot:
         self.application.add_handler(broadcast_handler)
         self.application.add_handler(stats_handler)
         self.application.add_handler(help_handler)
+        self.application.add_handler(add_handler)
         self.application.add_handler(general_callback_handler)
 
         # Set bot commands

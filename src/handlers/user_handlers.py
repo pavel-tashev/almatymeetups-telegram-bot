@@ -415,3 +415,61 @@ class ApplicationHandlers:
 
         await update.message.reply_text(CANCELLED_MSG)
         return ConversationHandler.END
+
+    async def add_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle the /add command - add user to the user table"""
+        import logging
+        from telegram.error import Forbidden, NetworkError, TimedOut
+
+        logger = logging.getLogger(__name__)
+        user = update.effective_user
+
+        logger.info(
+            f"ADD command received from user {user.id} (@{user.username}) - {user.first_name}"
+        )
+
+        # Check if user is already in the users table
+        existing_user = db.get_user_by_id(user.id)
+        if existing_user:
+            message = (
+                "✅ **You're already in our community!**\n\n"
+                "You're already registered in our user database. "
+                "You'll receive community updates and announcements."
+            )
+            try:
+                await update.message.reply_text(message, parse_mode="Markdown")
+                logger.info(f"User {user.id} already exists in users table")
+            except (TimedOut, NetworkError, Forbidden) as e:
+                logger.error(f"Error sending message to user {user.id}: {e}")
+            return
+
+        # Add user to the users table
+        try:
+            user_db_id = db.add_approved_user(
+                user_id=user.id,
+                username=user.username,
+                first_name=user.first_name,
+                last_name=user.last_name,
+            )
+            
+            message = (
+                "🎉 **Welcome to our community!**\n\n"
+                "You've been successfully added to our user database. "
+                "You'll now receive community updates, announcements, and meetup notifications.\n\n"
+                "Thank you for joining Almaty Meetups! 🇰🇿"
+            )
+            
+            await update.message.reply_text(message, parse_mode="Markdown")
+            logger.info(f"User {user.id} added to users table with ID {user_db_id}")
+            
+        except Exception as e:
+            logger.error(f"Error adding user {user.id} to users table: {e}")
+            error_message = (
+                "❌ **Something went wrong**\n\n"
+                "We couldn't add you to our community database right now. "
+                "Please try again later or contact an admin for assistance."
+            )
+            try:
+                await update.message.reply_text(error_message, parse_mode="Markdown")
+            except Exception as reply_error:
+                logger.error(f"Error sending error message to user {user.id}: {reply_error}")
