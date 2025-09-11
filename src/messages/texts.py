@@ -75,7 +75,6 @@ def admin_application_text(
     username: str | None,
     user_id: int,
     when: str,
-    request_id: int,
     explanation: str,
 ) -> str:
     handle = f" (@{username})" if username else ""
@@ -83,10 +82,8 @@ def admin_application_text(
     return (
         "📝 **New Join Request**\n\n"
         f"👤 **User:** [{first_name}{handle}]({user_link})\n"
-        f"🆔 **User ID:** `{user_id}`\n"
         f"📅 **Date:** {when}\n\n"
-        f"💬 **Explanation:**\n{explanation}\n\n"
-        f"⏰ **Request ID:** {request_id}"
+        f"💬 **User's Answer:**\n{explanation}"
     )
 
 

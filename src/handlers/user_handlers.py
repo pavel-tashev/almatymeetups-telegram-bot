@@ -1,7 +1,3 @@
-"""
-Bot handlers - separated from main bot class for better organization
-"""
-
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes, ConversationHandler
 
@@ -354,8 +350,7 @@ class ApplicationHandlers:
             first_name=user.first_name,
             username=user.username,
             user_id=user.id,
-            when=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            request_id=request_id,
+            when=datetime.now().strftime("%b %d, %Y at %I:%M %p"),
             explanation=explanation,
         )
 
