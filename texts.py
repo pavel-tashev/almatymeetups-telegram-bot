@@ -5,18 +5,7 @@ WELCOME_TEXT = (
     "To join our group, please tell us how you found out about us:"
 )
 
-# Option buttons
-OPTION_COUCHSURFING = "🏠 Couchsurfing"
-OPTION_INVITED = "👥 Someone invited me"
-OPTION_OTHER = "🔍 Other"
-
-# Follow-up questions
-QUESTION_COUCHSURFING = "What's your Couchsurfing profile link or username?"
-QUESTION_INVITED = (
-    "What is the Telegram username of the person who invited you to the group?"
-)
-QUESTION_OTHER = "How did you find out about the group? Please provide more details and a link if possible."
-
+# Button labels
 BACK_BUTTON = "⬅️ Back"
 COMPLETE_BUTTON = "✅ Complete Application"
 APPROVE_BUTTON = "✅ Approve"
@@ -25,11 +14,6 @@ COMMAND_START_DESC = "Start the application process"
 REQUEST_NOT_FOUND = "❌ Request not found."
 CANCELLED_MSG = "❌ Application cancelled. You can start again anytime with /start"
 
-# Explanation templates
-EXPLANATION_COUCHSURFING = "Found through Couchsurfing. Account: {answer}"
-EXPLANATION_INVITED = "Invited by: {answer}"
-EXPLANATION_OTHER = "Other: {answer}"
-
 # Error messages
 ERROR_INVITE_LINK_FAILED = "❌ Failed to send invite link to user {user_id}: {error}"
 ERROR_APPROVE_FAILED = "❌ Failed to approve user {user_id}: {error}"
@@ -37,6 +21,30 @@ ERROR_DECLINE_FAILED = "❌ Failed to decline user {user_id}: {error}"
 
 # Admin messages
 ADMIN_DECLINED_MSG = "❌ **{first_name}** has been **declined**."
+
+# Options configuration - easily extensible
+OPTIONS_CONFIG = {
+    "couchsurfing": {
+        "button_text": "🏠 Couchsurfing",
+        "question": "What's your Couchsurfing profile link or username?",
+        "explanation_template": "Found through Couchsurfing. Account: {answer}",
+    },
+    "invited": {
+        "button_text": "👥 Someone invited me",
+        "question": "What is the Telegram username of the person who invited you to the group?",
+        "explanation_template": "Invited by: {answer}",
+    },
+    "facebook": {
+        "button_text": "📘 Facebook",
+        "question": "What's your Facebook profile link or which Facebook group did you find us through?",
+        "explanation_template": "Found through Facebook: {answer}",
+    },
+    "other": {
+        "button_text": "🔍 Other",
+        "question": "How did you find out about the group? Please provide more details and a link if possible.",
+        "explanation_template": "Other: {answer}",
+    },
+}
 
 
 def complete_prompt(answer: str) -> str:

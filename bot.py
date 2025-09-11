@@ -25,16 +25,8 @@ from texts import (
     ERROR_APPROVE_FAILED,
     ERROR_DECLINE_FAILED,
     ERROR_INVITE_LINK_FAILED,
-    EXPLANATION_COUCHSURFING,
-    EXPLANATION_INVITED,
-    EXPLANATION_OTHER,
-    OPTION_COUCHSURFING,
-    OPTION_INVITED,
-    OPTION_OTHER,
+    OPTIONS_CONFIG,
     PENDING_REQUEST_MSG,
-    QUESTION_COUCHSURFING,
-    QUESTION_INVITED,
-    QUESTION_OTHER,
     REJECT_BUTTON,
     REQUEST_NOT_FOUND,
     SUBMITTED_MSG,
@@ -148,18 +140,21 @@ class TelegramBot:
     async def send_welcome_message(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
-        """Send the welcome message with three options"""
+        """Send the welcome message with dynamic options"""
         welcome_text = WELCOME_TEXT
 
-        keyboard = [
-            [
-                InlineKeyboardButton(
-                    OPTION_COUCHSURFING, callback_data="option_couchsurfing"
-                )
-            ],
-            [InlineKeyboardButton(OPTION_INVITED, callback_data="option_invited")],
-            [InlineKeyboardButton(OPTION_OTHER, callback_data="option_other")],
-        ]
+        # Dynamically create keyboard from configuration
+        keyboard = []
+        for option_key, option_config in OPTIONS_CONFIG.items():
+            keyboard.append(
+                [
+                    InlineKeyboardButton(
+                        option_config["button_text"],
+                        callback_data=f"option_{option_key}",
+                    )
+                ]
+            )
+
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         if update.callback_query:
@@ -183,13 +178,12 @@ class TelegramBot:
         # Store the selected option
         context.user_data["selected_option"] = option
 
-        # Ask the appropriate follow-up question
-        if option == "couchsurfing":
-            question_text = QUESTION_COUCHSURFING
-        elif option == "invited":
-            question_text = QUESTION_INVITED
-        else:  # other
-            question_text = QUESTION_OTHER
+        # Get question from configuration
+        if option in OPTIONS_CONFIG:
+            question_text = OPTIONS_CONFIG[option]["question"]
+        else:
+            # Fallback for unknown options
+            question_text = "Please provide more details:"
 
         keyboard = [[InlineKeyboardButton(BACK_BUTTON, callback_data="back")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -267,13 +261,14 @@ class TelegramBot:
         selected_option = context.user_data.get("selected_option", "unknown")
         answer = context.user_data.get("answer", "")
 
-        # Create the full explanation
-        if selected_option == "couchsurfing":
-            explanation = EXPLANATION_COUCHSURFING.format(answer=answer)
-        elif selected_option == "invited":
-            explanation = EXPLANATION_INVITED.format(answer=answer)
-        else:  # other
-            explanation = EXPLANATION_OTHER.format(answer=answer)
+        # Create the full explanation using configuration
+        if selected_option in OPTIONS_CONFIG:
+            explanation = OPTIONS_CONFIG[selected_option][
+                "explanation_template"
+            ].format(answer=answer)
+        else:
+            # Fallback for unknown options
+            explanation = f"Unknown option '{selected_option}': {answer}"
 
         # Save explanation to database
         db.update_user_explanation(request_id, explanation)
@@ -412,7 +407,7 @@ class TelegramBot:
                         await context.bot.send_message(
                             chat_id=ADMIN_CHAT_ID,
                             text=ERROR_INVITE_LINK_FAILED.format(
-                                user_id=request['user_id'], error=gen_err
+                                user_id=request["user_id"], error=gen_err
                             ),
                         )
                         return
@@ -423,7 +418,7 @@ class TelegramBot:
         except TelegramError as e:
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
-                text=ERROR_APPROVE_FAILED.format(user_id=request['user_id'], error=e),
+                text=ERROR_APPROVE_FAILED.format(user_id=request["user_id"], error=e),
             )
 
     async def decline_request(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -460,7 +455,7 @@ class TelegramBot:
             await query.delete_message()
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
-                text=ADMIN_DECLINED_MSG.format(first_name=request['first_name']),
+                text=ADMIN_DECLINED_MSG.format(first_name=request["first_name"]),
                 parse_mode="Markdown",
             )
 
@@ -476,7 +471,7 @@ class TelegramBot:
         except TelegramError as e:
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
-                text=ERROR_DECLINE_FAILED.format(user_id=request['user_id'], error=e),
+                text=ERROR_DECLINE_FAILED.format(user_id=request["user_id"], error=e),
             )
 
     async def cancel_application(
