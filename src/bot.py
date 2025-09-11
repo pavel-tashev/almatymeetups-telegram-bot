@@ -107,16 +107,31 @@ class TelegramBot:
 
     async def error_handler(self, update, context):
         """Handle errors that occur during bot operation"""
+        import logging
+        import traceback
+
         from telegram.error import NetworkError, TimedOut
 
+        logger = logging.getLogger(__name__)
         error = context.error
-        print(f"Bot error: {error}")
+
+        logger.error(f"Bot error: {error}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+
+        # Log update details if available
+        if update:
+            if update.effective_user:
+                logger.error(
+                    f"Error occurred for user {update.effective_user.id} (@{update.effective_user.username})"
+                )
+            if update.effective_message:
+                logger.error(f"Error in message: {update.effective_message.text}")
 
         # Handle specific error types
         if isinstance(error, (TimedOut, NetworkError)):
-            print(f"Network/timeout error: {error}")
+            logger.error(f"Network/timeout error: {error}")
         else:
-            print(f"Unexpected error: {error}")
+            logger.error(f"Unexpected error: {error}")
 
         # Try to notify user if possible
         if update and update.effective_message:
@@ -124,8 +139,9 @@ class TelegramBot:
                 await update.effective_message.reply_text(
                     "Sorry, there was a temporary issue. Please try again in a moment."
                 )
-            except Exception:
-                pass
+                logger.info("Error notification sent to user")
+            except Exception as notify_error:
+                logger.error(f"Failed to send error notification: {notify_error}")
 
     async def run(self):
         """Run the bot"""

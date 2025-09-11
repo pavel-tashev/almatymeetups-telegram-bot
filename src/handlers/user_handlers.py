@@ -29,52 +29,82 @@ class ApplicationHandlers:
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle the /start command"""
+        import logging
+
         from telegram.error import NetworkError, TimedOut
 
+        logger = logging.getLogger(__name__)
         user = update.effective_user
+
+        logger.info(
+            f"START command received from user {user.id} (@{user.username}) - {user.first_name}"
+        )
 
         # Check if user already has a pending request
         existing_request = db.get_request(user.id)
+        logger.info(f"Checking existing request for user {user.id}: {existing_request}")
+
         if existing_request and existing_request["status"] == "pending":
+            logger.info(f"User {user.id} has pending request, sending pending message")
             try:
                 await update.message.reply_text(PENDING_REQUEST_MSG)
+                logger.info(f"Pending message sent successfully to user {user.id}")
             except (TimedOut, NetworkError) as e:
-                print(f"Network error sending pending message: {e}")
+                logger.error(
+                    f"Network error sending pending message to user {user.id}: {e}"
+                )
             return ConversationHandler.END
 
         # Create new request
+        logger.info(f"Creating new request for user {user.id}")
         request_id = db.create_request(
             user_id=user.id,
             username=user.username,
             first_name=user.first_name,
             last_name=user.last_name,
         )
+        logger.info(f"Created request {request_id} for user {user.id}")
 
         # Store request_id in context
         context.user_data["request_id"] = request_id
 
         # Send welcome message with options
+        logger.info(f"Sending welcome message to user {user.id}")
         try:
             await self.send_welcome_message(update, context)
+            logger.info(f"Welcome message sent successfully to user {user.id}")
             return WAITING_FOR_EXPLANATION
         except Exception as e:
-            print(f"Error in start command: {e}")
+            logger.error(f"Error in start command for user {user.id}: {e}")
+            import traceback
+
+            logger.error(f"Full traceback: {traceback.format_exc()}")
             # Try to send a simple fallback message
             try:
                 await update.message.reply_text(
                     "Welcome! Please try again in a moment."
                 )
-            except Exception:
-                pass
+                logger.info(f"Fallback message sent to user {user.id}")
+            except Exception as fallback_error:
+                logger.error(
+                    f"Fallback message also failed for user {user.id}: {fallback_error}"
+                )
             return ConversationHandler.END
 
     async def send_welcome_message(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
         """Send the welcome message with dynamic options"""
+        import logging
+
         from telegram.error import NetworkError, TimedOut
 
+        logger = logging.getLogger(__name__)
+        user = update.effective_user
+        logger.info(f"Preparing welcome message for user {user.id}")
+
         welcome_text = WELCOME_TEXT
+        logger.info(f"Welcome text length: {len(welcome_text)} characters")
 
         # Dynamically create keyboard from configuration
         keyboard = []
@@ -89,28 +119,44 @@ class ApplicationHandlers:
             )
 
         reply_markup = InlineKeyboardMarkup(keyboard)
+        logger.info(f"Created keyboard with {len(keyboard)} options")
 
         try:
             if update.callback_query:
+                logger.info(f"Editing message for user {user.id} (callback query)")
                 await update.callback_query.edit_message_text(
                     text=welcome_text, reply_markup=reply_markup
                 )
             else:
+                logger.info(f"Sending new message to user {user.id}")
                 await update.message.reply_text(
                     text=welcome_text, reply_markup=reply_markup
                 )
+            logger.info(f"Welcome message sent successfully to user {user.id}")
         except (TimedOut, NetworkError) as e:
-            print(f"Network error sending welcome message: {e}")
+            logger.error(
+                f"Network error sending welcome message to user {user.id}: {e}"
+            )
             # Try to send a simple text message without markup
             try:
                 if update.callback_query:
+                    logger.info(f"Sending fallback message (edit) to user {user.id}")
                     await update.callback_query.edit_message_text(text=welcome_text)
                 else:
+                    logger.info(f"Sending fallback message (new) to user {user.id}")
                     await update.message.reply_text(text=welcome_text)
+                logger.info(f"Fallback message sent successfully to user {user.id}")
             except Exception as fallback_error:
-                print(f"Fallback message also failed: {fallback_error}")
+                logger.error(
+                    f"Fallback message also failed for user {user.id}: {fallback_error}"
+                )
         except Exception as e:
-            print(f"Unexpected error sending welcome message: {e}")
+            logger.error(
+                f"Unexpected error sending welcome message to user {user.id}: {e}"
+            )
+            import traceback
+
+            logger.error(f"Full traceback: {traceback.format_exc()}")
 
     async def handle_option_selection(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
