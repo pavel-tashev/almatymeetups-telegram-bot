@@ -15,8 +15,12 @@ from telegram.request import HTTPXRequest
 
 from admin_handlers import AdminHandlers
 from config import BOT_TOKEN
-from handlers import WAITING_FOR_ANSWER, WAITING_FOR_EXPLANATION, ApplicationHandlers
 from texts import COMMAND_START_DESC
+from user_handlers import (
+    WAITING_FOR_ANSWER,
+    WAITING_FOR_EXPLANATION,
+    ApplicationHandlers,
+)
 
 
 class TelegramBot:
