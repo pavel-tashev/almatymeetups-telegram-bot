@@ -1,8 +1,5 @@
-"""
-Refactored Telegram Bot - Clean separation of concerns
-"""
-
 from telegram import BotCommand
+from telegram.error import NetworkError, TimedOut
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -20,12 +17,15 @@ from handlers.user_handlers import (
     WAITING_FOR_EXPLANATION,
     ApplicationHandlers,
 )
-from messages.texts import COMMAND_START_DESC
+from messages.texts import (
+    ACTION_NOT_AVAILABLE,
+    COMMAND_HELP_DESC,
+    COMMAND_START_DESC,
+    TEMPORARY_ERROR_MSG,
+)
 
 
 class TelegramBot:
-    """Main bot class - orchestrates handlers and application setup"""
-
     def __init__(self):
         # Configure HTTP client with higher timeouts for Render environment
         http_request = HTTPXRequest(
@@ -134,7 +134,7 @@ class TelegramBot:
         # Note: Telegram doesn't support per-user command menus, so we show the most common commands
         # Users will see different options based on their role when they use /help
         commands = [
-            BotCommand("help", "Show available commands"),
+            BotCommand("help", COMMAND_HELP_DESC),
             BotCommand("start", COMMAND_START_DESC),
         ]
         try:
@@ -144,57 +144,19 @@ class TelegramBot:
 
     async def handle_general_callback(self, update, context):
         """Handle any callback queries that weren't caught by other handlers"""
-        import logging
-
-        logger = logging.getLogger(__name__)
-
         query = update.callback_query
-        user = query.from_user
-        logger.warning(f"Unhandled callback from user {user.id}: {query.data}")
 
         # Answer the callback to remove the loading state
-        await query.answer("This action is not available right now.")
-
-        # Log the callback data for debugging
-        logger.warning(f"Callback data: {query.data}, User: {user.id}")
+        await query.answer(ACTION_NOT_AVAILABLE)
 
     async def error_handler(self, update, context):
         """Handle errors that occur during bot operation"""
-        import logging
-        import traceback
-
-        from telegram.error import NetworkError, TimedOut
-
-        logger = logging.getLogger(__name__)
-        error = context.error
-
-        logger.error(f"Bot error: {error}")
-        logger.error(f"Full traceback: {traceback.format_exc()}")
-
-        # Log update details if available
-        if update:
-            if update.effective_user:
-                logger.error(
-                    f"Error occurred for user {update.effective_user.id} (@{update.effective_user.username})"
-                )
-            if update.effective_message:
-                logger.error(f"Error in message: {update.effective_message.text}")
-
-        # Handle specific error types
-        if isinstance(error, (TimedOut, NetworkError)):
-            logger.error(f"Network/timeout error: {error}")
-        else:
-            logger.error(f"Unexpected error: {error}")
-
         # Try to notify user if possible
         if update and update.effective_message:
             try:
-                await update.effective_message.reply_text(
-                    "Sorry, there was a temporary issue. Please try again in a moment."
-                )
-                logger.info("Error notification sent to user")
-            except Exception as notify_error:
-                logger.error(f"Failed to send error notification: {notify_error}")
+                await update.effective_message.reply_text(TEMPORARY_ERROR_MSG)
+            except Exception:
+                pass
 
     async def run(self):
         """Run the bot"""

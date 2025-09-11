@@ -12,6 +12,9 @@ TARGET_GROUP_ID = int(os.getenv("TARGET_GROUP_ID", 0))
 # Database
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///bot_database.db")
 
+# Timezone
+TIMEZONE = os.getenv("TIMEZONE", "Asia/Almaty")
+
 # Validation
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN is required")

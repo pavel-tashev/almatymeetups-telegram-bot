@@ -1,20 +1,31 @@
+from datetime import datetime, timedelta
+
+import pytz
 from telegram import Update
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
-from config.settings import ADMIN_CHAT_ID, TARGET_GROUP_ID
+from config.settings import ADMIN_CHAT_ID, TARGET_GROUP_ID, TIMEZONE
 from database.model import Model
 from messages.texts import (
     ADMIN_DECLINED_MSG,
+    ADMIN_HELP_TEXT,
+    ADMIN_ONLY_COMMAND,
+    BROADCAST_NO_MESSAGE,
+    BROADCAST_NO_USERS,
     ERROR_APPROVE_FAILED,
     ERROR_DECLINE_FAILED,
     ERROR_INVITE_LINK_FAILED,
     REQUEST_NOT_FOUND,
+    STATS_NO_USERS,
     USER_APPROVED_DM,
     USER_DECLINED_DM,
+    USER_HELP_TEXT,
     admin_approved_added,
     admin_approved_link_sent,
+    broadcast_summary,
     user_approved_with_link,
+    user_stats_text,
 )
 
 # Initialize database
@@ -206,26 +217,21 @@ class AdminHandlers:
         """Broadcast a message to all approved users (admin only)"""
         # Check if user is admin
         if not await is_admin_user(context.bot, update.effective_user.id):
-            await update.message.reply_text(
-                "❌ This command is only available to admins."
-            )
+            await update.message.reply_text(ADMIN_ONLY_COMMAND)
             return
 
         # Get the message text (everything after /broadcast)
         message_text = update.message.text.replace("/broadcast", "").strip()
 
         if not message_text:
-            await update.message.reply_text(
-                "❌ Please provide a message to broadcast.\n"
-                "Usage: /broadcast Your message here"
-            )
+            await update.message.reply_text(BROADCAST_NO_MESSAGE)
             return
 
         # Get all active users
         users = db.users.get_all_active()
 
         if not users:
-            await update.message.reply_text("❌ No approved users found.")
+            await update.message.reply_text(BROADCAST_NO_USERS)
             return
 
         # Send message to each user
@@ -247,41 +253,21 @@ class AdminHandlers:
                     db.users.deactivate(user["user_id"])
 
         # Send summary to admin
-        summary = (
-            f"📢 **Broadcast Complete**\n\n"
-            f"✅ Successfully sent: {successful_sends}\n"
-            f"❌ Failed to send: {failed_sends}\n"
-            f"👥 Total users: {len(users)}"
-        )
-
+        summary = broadcast_summary(successful_sends, failed_sends, len(users))
         await update.message.reply_text(summary, parse_mode="Markdown")
 
     async def user_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Get user statistics (admin only)"""
         # Check if user is admin
         if not await is_admin_user(context.bot, update.effective_user.id):
-            await update.message.reply_text(
-                "❌ This command is only available to admins."
-            )
+            await update.message.reply_text(ADMIN_ONLY_COMMAND)
             return
 
         # Get all active users
         users = db.users.get_all_active()
 
-        # Debug logging
-        import logging
-
-        logger = logging.getLogger(__name__)
-        logger.info(f"Stats command - Found {len(users)} active users")
-        if users:
-            logger.info(f"First user: {users[0]}")
-        else:
-            logger.warning("No active users found in database")
-
         if not users:
-            await update.message.reply_text(
-                "📊 **User Statistics**\n\n❌ No approved users found."
-            )
+            await update.message.reply_text(STATS_NO_USERS)
             return
 
         # Calculate statistics
@@ -290,12 +276,8 @@ class AdminHandlers:
         users_contacted = len([u for u in users if u["last_contacted_at"]])
 
         # Get recent approvals (last 7 days)
-        from datetime import datetime, timedelta
-
-        import pytz
-
-        # Use Almaty timezone for consistent date calculations
-        almaty_tz = pytz.timezone("Asia/Almaty")
+        # Use configured timezone for consistent date calculations
+        almaty_tz = pytz.timezone(TIMEZONE)
         week_ago = datetime.now(almaty_tz) - timedelta(days=7)
         recent_users = len(
             [
@@ -306,15 +288,9 @@ class AdminHandlers:
             ]
         )
 
-        stats_text = (
-            f"📊 **User Statistics**\n\n"
-            f"👥 **Total Approved Users:** {total_users}\n"
-            f"📱 **Users with Username:** {users_with_username}\n"
-            f"📞 **Users Contacted:** {users_contacted}\n"
-            f"🆕 **Approved This Week:** {recent_users}\n\n"
-            f"💡 Use `/broadcast <message>` to message all users"
+        stats_text = user_stats_text(
+            total_users, users_with_username, users_contacted, recent_users
         )
-
         await update.message.reply_text(stats_text, parse_mode="Markdown")
 
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -323,19 +299,8 @@ class AdminHandlers:
         is_admin = await is_admin_user(context.bot, user_id)
 
         if is_admin:
-            help_text = (
-                "🔧 **Admin Commands**\n\n"
-                "📊 `/stats` - View user statistics\n"
-                "📢 `/broadcast <message>` - Send message to all approved users\n"
-                "❓ `/help` - Show this help message"
-            )
+            help_text = ADMIN_HELP_TEXT
         else:
-            help_text = (
-                "🤖 **Available Commands**\n\n"
-                "🚀 `/start` - Start the application process to join our community\n"
-                "➕ `/add` - Add yourself to our community database\n"
-                "❓ `/help` - Show this help message\n\n"
-                "💡 **Welcome to Almaty Meetups!** We're a local community of foreigners and locals in Almaty, Kazakhstan."
-            )
+            help_text = USER_HELP_TEXT
 
         await update.message.reply_text(help_text, parse_mode="Markdown")
