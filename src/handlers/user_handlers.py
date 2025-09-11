@@ -40,6 +40,7 @@ class ApplicationHandlers:
 
         # Check if user is admin
         from handlers.admin_handlers import is_admin_user
+
         is_admin = await is_admin_user(context.bot, user.id)
         if is_admin:
             admin_message = (
@@ -367,11 +368,11 @@ class ApplicationHandlers:
 
         user = update.effective_user
 
-        # Create admin message with Almaty timezone
-        from datetime import timedelta, timezone
-
-        # Almaty is UTC+6
-        almaty_tz = timezone(timedelta(hours=6))
+        # Create admin message with Almaty timezone (handles DST automatically)
+        import pytz
+        
+        # Almaty timezone with automatic DST handling
+        almaty_tz = pytz.timezone('Asia/Almaty')
         almaty_time = datetime.now(almaty_tz)
 
         admin_text = admin_application_text(

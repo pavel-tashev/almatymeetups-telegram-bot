@@ -281,8 +281,11 @@ class AdminHandlers:
 
         # Get recent approvals (last 7 days)
         from datetime import datetime, timedelta
+        import pytz
 
-        week_ago = datetime.now() - timedelta(days=7)
+        # Use Almaty timezone for consistent date calculations
+        almaty_tz = pytz.timezone('Asia/Almaty')
+        week_ago = datetime.now(almaty_tz) - timedelta(days=7)
         recent_users = len(
             [
                 u
