@@ -1,7 +1,5 @@
 from datetime import datetime
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.interval import IntervalTrigger
 from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import TelegramError
 from telegram.ext import (
@@ -40,9 +38,8 @@ from texts import (
 # Conversation states
 WAITING_FOR_EXPLANATION, WAITING_FOR_ANSWER = range(2)
 
-# Initialize database and scheduler
+# Initialize database
 db = Database()
-scheduler = AsyncIOScheduler()
 
 
 class TelegramBot:
@@ -58,7 +55,7 @@ class TelegramBot:
             Application.builder().token(BOT_TOKEN).request(http_request).build()
         )
         self.setup_handlers()
-        self.setup_scheduler()
+        # Auto-rejection disabled; no scheduler setup
 
     def setup_handlers(self):
         """Setup all bot handlers"""
@@ -114,14 +111,7 @@ class TelegramBot:
         except Exception:
             pass
 
-    def setup_scheduler(self):
-        """Setup the scheduler for auto-rejection"""
-        scheduler.add_job(
-            self.check_expired_requests,
-            trigger=IntervalTrigger(hours=1),  # Check every hour
-            id="expired_requests_check",
-        )
-        scheduler.start()
+    
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle the /start command"""
@@ -491,22 +481,7 @@ class TelegramBot:
         )
         return ConversationHandler.END
 
-    async def check_expired_requests(self):
-        """Check for expired requests and mark them expired + notify user"""
-        expired_requests = db.get_expired_requests()
-
-        for request in expired_requests:
-            # Update request status only; no server-side decline needed for bot-link flow
-            db.update_request_status(request["id"], "expired")
-
-            # Notify user
-            try:
-                await self.application.bot.send_message(
-                    chat_id=request["user_id"],
-                    text="⏰ Your application has expired and been automatically declined. You can apply again anytime.",
-                )
-            except Exception:
-                pass
+    
 
     async def run(self):
         """Run the bot"""
