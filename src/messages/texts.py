@@ -11,7 +11,7 @@ COMMAND_HELP_DESC = "Show available commands"
 
 # Welcome and initial messages
 WELCOME_TEXT = (
-    "👋 Welcome to our `Almaty Meetups`!\n\n"
+    "👋 Welcome to `Almaty Meetups`!\n\n"
     "We are a local community of foreigners and locals based in Almaty, Kazakhstan.\n\n"
     "Our purpose is to meet and connect with travelers and people living in Almaty. We frequently organize gatherings and events to meet new people and make new friends.\n\n"
     "To join our group, please tell us how you found out about us:"

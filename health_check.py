@@ -17,6 +17,7 @@ from bot import TelegramBot
 
 # Global bot instance
 bot_instance = None
+bot_task = None
 
 
 async def health_check(request):
@@ -35,9 +36,14 @@ async def health_check(request):
 
 async def start_bot():
     """Start the Telegram bot with conflict handling"""
-    global bot_instance
+    global bot_instance, bot_task
     max_retries = 3
     retry_delay = 5  # seconds
+
+    # Don't start if already running
+    if bot_instance is not None and bot_task is not None and not bot_task.done():
+        print("Bot is already running, skipping startup")
+        return
 
     for attempt in range(max_retries):
         try:
@@ -47,9 +53,11 @@ async def start_bot():
             # Initialize the bot application properly
             await bot_instance.application.initialize()
             await bot_instance.application.start()
-            await bot_instance.application.updater.start_polling()
 
-            print("Bot started successfully!")
+            print("Bot initialized successfully!")
+
+            # Start the bot in a separate task to handle conflicts gracefully
+            bot_task = asyncio.create_task(bot_instance.run())
             return
 
         except Exception as e:
@@ -105,6 +113,13 @@ async def main():
         pass
     finally:
         # Clean up bot
+        if bot_task and not bot_task.done():
+            try:
+                bot_task.cancel()
+                await bot_task
+            except Exception:
+                pass
+
         if bot_instance:
             try:
                 await bot_instance.application.updater.stop()

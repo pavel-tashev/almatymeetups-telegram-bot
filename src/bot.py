@@ -293,7 +293,15 @@ class TelegramBot:
         This method starts the bot's polling mechanism to receive and process
         incoming updates from Telegram.
         """
-        await self.application.run_polling()
+        try:
+            await self.application.run_polling()
+        except Conflict as e:
+            print(f"Bot conflict detected during polling: {e}")
+            print("This usually means multiple bot instances are running.")
+            # Don't re-raise to allow the health check server to continue
+        except Exception as e:
+            print(f"Unexpected error during bot polling: {e}")
+            # Don't re-raise to allow the health check server to continue
 
 
 if __name__ == "__main__":
