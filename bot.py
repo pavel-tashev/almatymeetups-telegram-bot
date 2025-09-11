@@ -16,11 +16,18 @@ from telegram.request import HTTPXRequest
 from config import ADMIN_CHAT_ID, BOT_TOKEN, TARGET_GROUP_ID
 from database import Database
 from texts import (
+    ADMIN_DECLINED_MSG,
     APPROVE_BUTTON,
     BACK_BUTTON,
     CANCELLED_MSG,
     COMMAND_START_DESC,
     COMPLETE_BUTTON,
+    ERROR_APPROVE_FAILED,
+    ERROR_DECLINE_FAILED,
+    ERROR_INVITE_LINK_FAILED,
+    EXPLANATION_COUCHSURFING,
+    EXPLANATION_INVITED,
+    EXPLANATION_OTHER,
     OPTION_COUCHSURFING,
     OPTION_INVITED,
     OPTION_OTHER,
@@ -262,11 +269,11 @@ class TelegramBot:
 
         # Create the full explanation
         if selected_option == "couchsurfing":
-            explanation = f"Found through Couchsurfing. Account: {answer}"
+            explanation = EXPLANATION_COUCHSURFING.format(answer=answer)
         elif selected_option == "invited":
-            explanation = f"Invited by: {answer}"
+            explanation = EXPLANATION_INVITED.format(answer=answer)
         else:  # other
-            explanation = f"Other: {answer}"
+            explanation = EXPLANATION_OTHER.format(answer=answer)
 
         # Save explanation to database
         db.update_user_explanation(request_id, explanation)
@@ -404,7 +411,9 @@ class TelegramBot:
                     except TelegramError as gen_err:
                         await context.bot.send_message(
                             chat_id=ADMIN_CHAT_ID,
-                            text=f"❌ Failed to send invite link to user {request['user_id']}: {gen_err}",
+                            text=ERROR_INVITE_LINK_FAILED.format(
+                                user_id=request['user_id'], error=gen_err
+                            ),
                         )
                         return
                 else:
@@ -414,7 +423,7 @@ class TelegramBot:
         except TelegramError as e:
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
-                text=f"❌ Failed to approve user {request['user_id']}: {e}",
+                text=ERROR_APPROVE_FAILED.format(user_id=request['user_id'], error=e),
             )
 
     async def decline_request(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -451,7 +460,7 @@ class TelegramBot:
             await query.delete_message()
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
-                text=f"❌ **{request['first_name']}** has been **declined**.",
+                text=ADMIN_DECLINED_MSG.format(first_name=request['first_name']),
                 parse_mode="Markdown",
             )
 
@@ -467,7 +476,7 @@ class TelegramBot:
         except TelegramError as e:
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
-                text=f"❌ Failed to decline user {request['user_id']}: {e}",
+                text=ERROR_DECLINE_FAILED.format(user_id=request['user_id'], error=e),
             )
 
     async def cancel_application(

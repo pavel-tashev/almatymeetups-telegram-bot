@@ -25,6 +25,19 @@ COMMAND_START_DESC = "Start the application process"
 REQUEST_NOT_FOUND = "❌ Request not found."
 CANCELLED_MSG = "❌ Application cancelled. You can start again anytime with /start"
 
+# Explanation templates
+EXPLANATION_COUCHSURFING = "Found through Couchsurfing. Account: {answer}"
+EXPLANATION_INVITED = "Invited by: {answer}"
+EXPLANATION_OTHER = "Other: {answer}"
+
+# Error messages
+ERROR_INVITE_LINK_FAILED = "❌ Failed to send invite link to user {user_id}: {error}"
+ERROR_APPROVE_FAILED = "❌ Failed to approve user {user_id}: {error}"
+ERROR_DECLINE_FAILED = "❌ Failed to decline user {user_id}: {error}"
+
+# Admin messages
+ADMIN_DECLINED_MSG = "❌ **{first_name}** has been **declined**."
+
 
 def complete_prompt(answer: str) -> str:
     return (
