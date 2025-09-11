@@ -29,6 +29,7 @@ class Database:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 approved_at TIMESTAMP,
                 admin_message_id INTEGER,
+                user_explanation TEXT,
                 UNIQUE(user_id)
             )
         """
@@ -75,6 +76,21 @@ class Database:
 
         return request_id
 
+    def update_user_explanation(self, request_id: int, explanation: str):
+        """Update the user's explanation for a request"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            UPDATE requests SET user_explanation = ? WHERE id = ?
+        """,
+            (explanation, request_id),
+        )
+
+        conn.commit()
+        conn.close()
+
     def get_request(self, user_id: int) -> Optional[Dict]:
         """Get a request by user_id"""
         conn = sqlite3.connect(self.db_path)
@@ -101,6 +117,7 @@ class Database:
                 "created_at": row[6],
                 "approved_at": row[7],
                 "admin_message_id": row[8],
+                "user_explanation": row[9] if len(row) > 9 else None,
             }
         return None
 
@@ -198,6 +215,7 @@ class Database:
                 "created_at": row[6],
                 "approved_at": row[7],
                 "admin_message_id": row[8],
+                "user_explanation": row[9] if len(row) > 9 else None,
             }
             for row in rows
         ]
@@ -228,5 +246,6 @@ class Database:
                 "created_at": row[6],
                 "approved_at": row[7],
                 "admin_message_id": row[8],
+                "user_explanation": row[9] if len(row) > 9 else None,
             }
         return None
