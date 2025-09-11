@@ -8,7 +8,6 @@ from telegram.error import TelegramError
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
-    ChatJoinRequestHandler,
     CommandHandler,
     ContextTypes,
     ConversationHandler,
@@ -68,9 +67,6 @@ class TelegramBot:
         # Start command handler
         start_handler = CommandHandler("start", self.start_command)
 
-        # Chat join request handler (for invite links)
-        join_request_handler = ChatJoinRequestHandler(self.handle_chat_join_request)
-
         # Main conversation handler
         main_conversation = ConversationHandler(
             entry_points=[start_handler],
@@ -103,7 +99,6 @@ class TelegramBot:
         )
 
         # Add handlers
-        self.application.add_handler(join_request_handler)
         self.application.add_handler(main_conversation)
         self.application.add_handler(approve_handler)
         self.application.add_handler(decline_handler)
@@ -336,48 +331,6 @@ class TelegramBot:
             )
             # Store admin message ID
             db.update_request_status(request_id, "pending", admin_message.message_id)
-        except Exception:
-            pass
-
-    async def handle_chat_join_request(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        """Handle chat join requests from invite links"""
-        join_request = update.chat_join_request
-        user = join_request.from_user
-        chat = join_request.chat
-
-        # Check if user already has a pending request
-        existing_request = db.get_request(user.id)
-        if existing_request and existing_request["status"] == "pending":
-            await context.bot.send_message(
-                chat_id=chat.id,
-                text=f"@{user.username or user.first_name} already has a pending request. Please wait for admin approval.",
-            )
-            return
-
-        # Create pre-filled message link for verification
-        verification_message = (
-            f"Hi! I'd like to join the group. My user ID is {user.id}."
-        )
-        encoded_message = verification_message.replace(" ", "%20").replace("!", "%21")
-        bot_link = f"https://t.me/{context.bot.username}?text={encoded_message}"
-
-        # Create button with the pre-filled message link
-        keyboard = [[InlineKeyboardButton("🔐 Start Application", url=bot_link)]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        verification_text = (
-            f"👋 Hello @{user.username or user.first_name}!\n\n"
-            "Thank you for requesting to join our community!\n\n"
-            "To complete your membership, please click the button below to start the application process.\n\n"
-            "⚠️ **Important:** You must complete the application within 24 hours or your request will be automatically declined."
-        )
-
-        try:
-            await context.bot.send_message(
-                chat_id=chat.id, text=verification_text, reply_markup=reply_markup
-            )
         except Exception:
             pass
 
