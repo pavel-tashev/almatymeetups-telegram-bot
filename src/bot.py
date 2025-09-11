@@ -60,6 +60,10 @@ class TelegramBot:
                     CallbackQueryHandler(
                         self.app_handlers.handle_back_button, pattern="^back$"
                     ),
+                    CallbackQueryHandler(
+                        self.app_handlers.handle_complete_application,
+                        pattern="^complete$",
+                    ),
                     MessageHandler(
                         filters.TEXT & ~filters.COMMAND,
                         self.app_handlers.handle_explanation,
@@ -69,12 +73,12 @@ class TelegramBot:
                     CallbackQueryHandler(
                         self.app_handlers.handle_back_button, pattern="^back$"
                     ),
-                    MessageHandler(
-                        filters.TEXT & ~filters.COMMAND, self.app_handlers.handle_answer
-                    ),
                     CallbackQueryHandler(
                         self.app_handlers.handle_complete_application,
                         pattern="^complete$",
+                    ),
+                    MessageHandler(
+                        filters.TEXT & ~filters.COMMAND, self.app_handlers.handle_answer
                     ),
                 ],
             },
