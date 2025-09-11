@@ -3,7 +3,14 @@ from typing import Any, Callable, Dict, List, Optional
 
 import pytz
 from telegram import Update
-from telegram.error import Forbidden, NetworkError, TelegramError, TimedOut
+from telegram.error import (
+    BadRequest,
+    Conflict,
+    Forbidden,
+    NetworkError,
+    TelegramError,
+    TimedOut,
+)
 from telegram.ext import ContextTypes
 
 from config.settings import (
@@ -59,8 +66,18 @@ async def is_admin_user(bot, user_id: int) -> bool:
     try:
         chat_member = await bot.get_chat_member(ADMIN_CHAT_ID, user_id)
         return chat_member.status in ["administrator", "creator"]
-    except Exception:
-        # If we can't check (e.g., user not in group), return False
+    except Forbidden:
+        # User is not in the admin group
+        return False
+    except BadRequest:
+        # Invalid chat_id or user_id
+        return False
+    except (NetworkError, TimedOut):
+        # Network issues - assume not admin for safety
+        return False
+    except Exception as e:
+        # Other unexpected errors - log and assume not admin for safety
+        print(f"Unexpected error checking admin status: {e}")
         return False
 
 
@@ -116,15 +133,27 @@ class AdminHandlers:
             return await operation(*args, **kwargs)
         except (TimedOut, NetworkError) as e:
             # Handle network issues - these are usually temporary
+            print(f"Network error in admin operation: {e}")
             return None
         except Forbidden as e:
             # Handle blocked users or permission issues
+            print(f"Forbidden error in admin operation: {e}")
+            return None
+        except BadRequest as e:
+            # Handle malformed requests (e.g., invalid chat_id, message too long)
+            print(f"Bad request in admin operation: {e}")
+            return None
+        except Conflict as e:
+            # Handle conflicts (e.g., multiple bot instances)
+            print(f"Conflict in admin operation: {e}")
             return None
         except TelegramError as e:
             # Handle other Telegram-specific errors
+            print(f"Telegram error in admin operation: {e}")
             raise e
         except Exception as e:
             # Handle unexpected errors
+            print(f"Unexpected error in admin operation: {e}")
             raise e
 
     async def _safe_send_message(

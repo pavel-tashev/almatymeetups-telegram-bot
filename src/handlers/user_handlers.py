@@ -3,7 +3,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import pytz
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.error import Forbidden, NetworkError, TimedOut
+from telegram.error import BadRequest, Conflict, Forbidden, NetworkError, TimedOut
 from telegram.ext import ContextTypes, ConversationHandler
 
 from config.questions import QUESTIONS
@@ -90,12 +90,23 @@ class ApplicationHandlers:
             return await operation(*args, **kwargs)
         except (TimedOut, NetworkError) as e:
             # Handle network issues - these are usually temporary
+            print(f"Network error in user operation: {e}")
             return None
         except Forbidden as e:
             # Handle blocked users or permission issues
+            print(f"Forbidden error in user operation: {e}")
+            return None
+        except BadRequest as e:
+            # Handle malformed requests (e.g., invalid chat_id, message too long)
+            print(f"Bad request in user operation: {e}")
+            return None
+        except Conflict as e:
+            # Handle conflicts (e.g., multiple bot instances)
+            print(f"Conflict in user operation: {e}")
             return None
         except Exception as e:
             # Handle unexpected errors
+            print(f"Unexpected error in user operation: {e}")
             return None
 
     async def _safe_reply_text(
@@ -463,7 +474,8 @@ class ApplicationHandlers:
 
             await self._safe_reply_text(update, message, parse_mode="Markdown")
 
-        except Exception:
+        except Exception as e:
+            print(f"Error in add_command: {e}")
             await self._safe_reply_text(
                 update, ADD_COMMAND_ERROR, parse_mode="Markdown"
             )

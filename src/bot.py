@@ -1,7 +1,7 @@
 from typing import Any, Dict, List
 
 from telegram import BotCommand, Update
-from telegram.error import NetworkError, TimedOut
+from telegram.error import Conflict, NetworkError, TimedOut
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -262,12 +262,29 @@ class TelegramBot:
         This method provides centralized error handling and attempts to notify
         users of temporary issues when possible.
         """
-        # Try to notify user if possible
-        if update and update.effective_message:
-            try:
-                await update.effective_message.reply_text(TEMPORARY_ERROR_MSG)
-            except Exception:
-                pass
+        # Get the error from context
+        error = context.error
+
+        # Handle specific error types
+        if isinstance(error, Conflict):
+            # Conflict usually means multiple bot instances - don't notify user
+            print(f"Bot conflict detected: {error}")
+            return
+        elif isinstance(error, (NetworkError, TimedOut)):
+            # Network issues - notify user if possible
+            if update and update.effective_message:
+                try:
+                    await update.effective_message.reply_text(TEMPORARY_ERROR_MSG)
+                except Exception:
+                    pass
+        else:
+            # Other errors - log and notify user if possible
+            print(f"Unexpected error: {error}")
+            if update and update.effective_message:
+                try:
+                    await update.effective_message.reply_text(TEMPORARY_ERROR_MSG)
+                except Exception:
+                    pass
 
     async def run(self) -> None:
         """

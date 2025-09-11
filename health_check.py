@@ -41,7 +41,10 @@ async def start_bot():
         await bot_instance.application.start()
         await bot_instance.application.updater.start_polling()
 
-    except Exception:
+    except Exception as e:
+        # Log the error for debugging
+        print(f"Failed to start bot: {e}")
+        # Don't re-raise to allow the health check server to continue
         pass
 
 
