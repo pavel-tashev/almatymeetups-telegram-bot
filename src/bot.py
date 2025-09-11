@@ -71,6 +71,9 @@ class TelegramBot:
                 ],
                 WAITING_FOR_ANSWER: [
                     CallbackQueryHandler(
+                        self.app_handlers.handle_option_selection, pattern="^option_"
+                    ),
+                    CallbackQueryHandler(
                         self.app_handlers.handle_back_button, pattern="^back$"
                     ),
                     CallbackQueryHandler(
