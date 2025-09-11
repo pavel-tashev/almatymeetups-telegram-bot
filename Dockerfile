@@ -20,4 +20,4 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 # Run the bot with health check
-CMD ["python", "bot_with_health_check.py"]
+CMD ["python", "health_check.py"]
