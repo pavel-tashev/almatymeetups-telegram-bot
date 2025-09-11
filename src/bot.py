@@ -57,6 +57,9 @@ class TelegramBot:
                     CallbackQueryHandler(
                         self.app_handlers.handle_option_selection, pattern="^option_"
                     ),
+                    CallbackQueryHandler(
+                        self.app_handlers.handle_back_button, pattern="^back$"
+                    ),
                     MessageHandler(
                         filters.TEXT & ~filters.COMMAND,
                         self.app_handlers.handle_explanation,
