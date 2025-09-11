@@ -6,6 +6,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import TelegramError
+from telegram.request import HTTPXRequest
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -37,7 +38,16 @@ scheduler = AsyncIOScheduler()
 
 class TelegramBot:
     def __init__(self):
-        self.application = Application.builder().token(BOT_TOKEN).build()
+        # Configure HTTP client with higher timeouts to avoid startup TimedOut
+        http_request = HTTPXRequest(
+            connect_timeout=20.0,
+            read_timeout=30.0,
+            write_timeout=30.0,
+            pool_timeout=10.0,
+        )
+        self.application = (
+            Application.builder().token(BOT_TOKEN).request(http_request).build()
+        )
         self.setup_handlers()
         self.setup_scheduler()
 
@@ -431,15 +441,23 @@ class TelegramBot:
                 )
             except TelegramError as e:
                 # If no join request exists, try to add user directly
-                if "Hide_requester_missing" in str(e) or "CHAT_JOIN_REQUEST_NOT_FOUND" in str(e):
-                    logger.info(f"No join request found for user {request['user_id']}, trying to add directly")
+                if "Hide_requester_missing" in str(
+                    e
+                ) or "CHAT_JOIN_REQUEST_NOT_FOUND" in str(e):
+                    logger.info(
+                        f"No join request found for user {request['user_id']}, trying to add directly"
+                    )
                     try:
                         await context.bot.add_chat_member(
                             chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
                         )
-                        logger.info(f"Successfully added user {request['user_id']} directly to group")
+                        logger.info(
+                            f"Successfully added user {request['user_id']} directly to group"
+                        )
                     except TelegramError as add_error:
-                        logger.error(f"Failed to add user {request['user_id']} directly: {add_error}")
+                        logger.error(
+                            f"Failed to add user {request['user_id']} directly: {add_error}"
+                        )
                         raise add_error
                 else:
                     raise e
@@ -465,9 +483,7 @@ class TelegramBot:
                 logger.error(f"Failed to notify user {request['user_id']}: {e}")
 
         except TelegramError as e:
-            logger.error(
-                f"Failed to approve/add user {request['user_id']}: {e}"
-            )
+            logger.error(f"Failed to approve/add user {request['user_id']}: {e}")
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
                 text=f"❌ Failed to approve user {request['user_id']}: {e}",
@@ -497,8 +513,12 @@ class TelegramBot:
                 )
             except TelegramError as e:
                 # If no join request exists, just log it (no need to decline)
-                if "Hide_requester_missing" in str(e) or "CHAT_JOIN_REQUEST_NOT_FOUND" in str(e):
-                    logger.info(f"No join request found for user {request['user_id']}, just marking as declined")
+                if "Hide_requester_missing" in str(
+                    e
+                ) or "CHAT_JOIN_REQUEST_NOT_FOUND" in str(e):
+                    logger.info(
+                        f"No join request found for user {request['user_id']}, just marking as declined"
+                    )
                 else:
                     raise e
 
@@ -523,9 +543,7 @@ class TelegramBot:
                 logger.error(f"Failed to notify user {request['user_id']}: {e}")
 
         except TelegramError as e:
-            logger.error(
-                f"Failed to decline user {request['user_id']}: {e}"
-            )
+            logger.error(f"Failed to decline user {request['user_id']}: {e}")
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
                 text=f"❌ Failed to decline user {request['user_id']}: {e}",
