@@ -1,8 +1,7 @@
 """
-Keep-alive script to prevent Render free tier from spinning down
-Uses a simple HTTP server that can be pinged externally
+Telegram Bot with HTTP Health Check for Render
+Prevents Render free tier from spinning down by providing a health endpoint
 """
-
 import asyncio
 import logging
 from datetime import datetime
@@ -22,7 +21,7 @@ bot_instance = None
 
 
 async def health_check(request):
-    """Health check endpoint"""
+    """Health check endpoint - Render will ping this to keep instance alive"""
     return web.json_response(
         {
             "status": "healthy",
@@ -60,8 +59,8 @@ async def init_app():
 
 
 async def main():
-    """Main function"""
-    logger.info("Starting keep-alive service with HTTP server...")
+    """Main function - starts both HTTP server and Telegram bot"""
+    logger.info("Starting Telegram bot with HTTP health check...")
 
     app = await init_app()
 
@@ -75,6 +74,7 @@ async def main():
 
     logger.info("HTTP server started on port 10000")
     logger.info("Health check available at: http://localhost:10000/health")
+    logger.info("Bot is running and ready to receive messages!")
 
     # Keep the server running
     try:
