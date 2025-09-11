@@ -27,12 +27,12 @@ class TelegramBot:
     """Main bot class - orchestrates handlers and application setup"""
 
     def __init__(self):
-        # Configure HTTP client with higher timeouts to avoid startup TimedOut
+        # Configure HTTP client with higher timeouts for Render environment
         http_request = HTTPXRequest(
-            connect_timeout=20.0,
-            read_timeout=30.0,
-            write_timeout=30.0,
-            pool_timeout=10.0,
+            connect_timeout=60.0,
+            read_timeout=120.0,
+            write_timeout=60.0,
+            pool_timeout=30.0,
         )
         self.application = (
             Application.builder().token(BOT_TOKEN).request(http_request).build()
@@ -94,6 +94,9 @@ class TelegramBot:
         # Set bot commands
         self.application.post_init = self.set_bot_commands
 
+        # Add error handler
+        self.application.add_error_handler(self.error_handler)
+
     async def set_bot_commands(self, application):
         """Set bot commands menu"""
         commands = [BotCommand("start", COMMAND_START_DESC)]
@@ -101,6 +104,28 @@ class TelegramBot:
             await application.bot.set_my_commands(commands)
         except Exception:
             pass
+
+    async def error_handler(self, update, context):
+        """Handle errors that occur during bot operation"""
+        from telegram.error import NetworkError, TimedOut
+
+        error = context.error
+        print(f"Bot error: {error}")
+
+        # Handle specific error types
+        if isinstance(error, (TimedOut, NetworkError)):
+            print(f"Network/timeout error: {error}")
+        else:
+            print(f"Unexpected error: {error}")
+
+        # Try to notify user if possible
+        if update and update.effective_message:
+            try:
+                await update.effective_message.reply_text(
+                    "Sorry, there was a temporary issue. Please try again in a moment."
+                )
+            except Exception:
+                pass
 
     async def run(self):
         """Run the bot"""

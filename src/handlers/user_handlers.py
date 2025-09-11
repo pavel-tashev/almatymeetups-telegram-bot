@@ -29,12 +29,17 @@ class ApplicationHandlers:
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle the /start command"""
+        from telegram.error import NetworkError, TimedOut
+
         user = update.effective_user
 
         # Check if user already has a pending request
         existing_request = db.get_request(user.id)
         if existing_request and existing_request["status"] == "pending":
-            await update.message.reply_text(PENDING_REQUEST_MSG)
+            try:
+                await update.message.reply_text(PENDING_REQUEST_MSG)
+            except (TimedOut, NetworkError) as e:
+                print(f"Network error sending pending message: {e}")
             return ConversationHandler.END
 
         # Create new request
@@ -49,13 +54,26 @@ class ApplicationHandlers:
         context.user_data["request_id"] = request_id
 
         # Send welcome message with options
-        await self.send_welcome_message(update, context)
-        return WAITING_FOR_EXPLANATION
+        try:
+            await self.send_welcome_message(update, context)
+            return WAITING_FOR_EXPLANATION
+        except Exception as e:
+            print(f"Error in start command: {e}")
+            # Try to send a simple fallback message
+            try:
+                await update.message.reply_text(
+                    "Welcome! Please try again in a moment."
+                )
+            except Exception:
+                pass
+            return ConversationHandler.END
 
     async def send_welcome_message(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
         """Send the welcome message with dynamic options"""
+        from telegram.error import NetworkError, TimedOut
+
         welcome_text = WELCOME_TEXT
 
         # Dynamically create keyboard from configuration
@@ -72,14 +90,27 @@ class ApplicationHandlers:
 
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        if update.callback_query:
-            await update.callback_query.edit_message_text(
-                text=welcome_text, reply_markup=reply_markup
-            )
-        else:
-            await update.message.reply_text(
-                text=welcome_text, reply_markup=reply_markup
-            )
+        try:
+            if update.callback_query:
+                await update.callback_query.edit_message_text(
+                    text=welcome_text, reply_markup=reply_markup
+                )
+            else:
+                await update.message.reply_text(
+                    text=welcome_text, reply_markup=reply_markup
+                )
+        except (TimedOut, NetworkError) as e:
+            print(f"Network error sending welcome message: {e}")
+            # Try to send a simple text message without markup
+            try:
+                if update.callback_query:
+                    await update.callback_query.edit_message_text(text=welcome_text)
+                else:
+                    await update.message.reply_text(text=welcome_text)
+            except Exception as fallback_error:
+                print(f"Fallback message also failed: {fallback_error}")
+        except Exception as e:
+            print(f"Unexpected error sending welcome message: {e}")
 
     async def handle_option_selection(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
