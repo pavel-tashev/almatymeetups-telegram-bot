@@ -211,7 +211,9 @@ class TelegramBot:
         await self.send_welcome_message(update, context)
         return WAITING_FOR_EXPLANATION
 
-    async def handle_explanation(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_explanation(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
         """Handle user's free-text explanation from the welcome screen"""
         user = update.effective_user
         explanation_text = update.message.text
@@ -419,13 +421,28 @@ class TelegramBot:
             return
 
         try:
-            # Approve the chat join request
-            await context.bot.approve_chat_join_request(
-                chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
-            )
-            logger.info(
-                f"Successfully approved chat join request for user {request['user_id']}"
-            )
+            # Try to approve the chat join request first
+            try:
+                await context.bot.approve_chat_join_request(
+                    chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
+                )
+                logger.info(
+                    f"Successfully approved chat join request for user {request['user_id']}"
+                )
+            except TelegramError as e:
+                # If no join request exists, try to add user directly
+                if "Hide_requester_missing" in str(e) or "CHAT_JOIN_REQUEST_NOT_FOUND" in str(e):
+                    logger.info(f"No join request found for user {request['user_id']}, trying to add directly")
+                    try:
+                        await context.bot.add_chat_member(
+                            chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
+                        )
+                        logger.info(f"Successfully added user {request['user_id']} directly to group")
+                    except TelegramError as add_error:
+                        logger.error(f"Failed to add user {request['user_id']} directly: {add_error}")
+                        raise add_error
+                else:
+                    raise e
 
             # Update request status
             db.update_request_status(request_id, "approved", query.message.message_id)
@@ -449,7 +466,7 @@ class TelegramBot:
 
         except TelegramError as e:
             logger.error(
-                f"Failed to approve chat join request for user {request['user_id']}: {e}"
+                f"Failed to approve/add user {request['user_id']}: {e}"
             )
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
@@ -470,13 +487,20 @@ class TelegramBot:
             return
 
         try:
-            # Decline the chat join request
-            await context.bot.decline_chat_join_request(
-                chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
-            )
-            logger.info(
-                f"Successfully declined chat join request for user {request['user_id']}"
-            )
+            # Try to decline the chat join request first
+            try:
+                await context.bot.decline_chat_join_request(
+                    chat_id=TARGET_GROUP_ID, user_id=request["user_id"]
+                )
+                logger.info(
+                    f"Successfully declined chat join request for user {request['user_id']}"
+                )
+            except TelegramError as e:
+                # If no join request exists, just log it (no need to decline)
+                if "Hide_requester_missing" in str(e) or "CHAT_JOIN_REQUEST_NOT_FOUND" in str(e):
+                    logger.info(f"No join request found for user {request['user_id']}, just marking as declined")
+                else:
+                    raise e
 
             # Update request status
             db.update_request_status(request_id, "declined", query.message.message_id)
@@ -500,7 +524,7 @@ class TelegramBot:
 
         except TelegramError as e:
             logger.error(
-                f"Failed to decline chat join request for user {request['user_id']}: {e}"
+                f"Failed to decline user {request['user_id']}: {e}"
             )
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
