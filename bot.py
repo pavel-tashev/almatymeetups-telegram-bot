@@ -35,7 +35,6 @@ from texts import (
     admin_approved_link_sent,
     admin_declined,
     complete_prompt,
-    group_verification_text,
     user_approved_with_link,
 )
 

@@ -55,13 +55,3 @@ def user_approved_with_link(invite_link: str) -> str:
         f"{invite_link}\n\n"
         "Note: This link works once and expires after first use."
     )
-
-
-# Group join request prompt
-def group_verification_text(username_or_name: str) -> str:
-    return (
-        f"👋 Hello @{username_or_name}!\n\n"
-        "Thank you for requesting to join our community!\n\n"
-        "To complete your membership, please click the button below to start the application process.\n\n"
-        "⚠️ **Important:** You must complete the application within 24 hours or your request will be automatically declined."
-    )
