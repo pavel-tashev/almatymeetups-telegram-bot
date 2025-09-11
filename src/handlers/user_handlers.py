@@ -1,19 +1,12 @@
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
 
 import pytz
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.error import BadRequest, Conflict, Forbidden, NetworkError, TimedOut
+from telegram.error import Forbidden, NetworkError, TimedOut
 from telegram.ext import ContextTypes, ConversationHandler
 
 from config.questions import QUESTIONS
-from config.settings import (
-    ADMIN_CHAT_ID,
-    CALLBACK_BACK,
-    CALLBACK_COMPLETE,
-    REQUEST_STATUS_PENDING,
-    TIMEZONE,
-)
+from config.settings import ADMIN_CHAT_ID, TIMEZONE
 from database.model import Model
 from handlers.admin_handlers import is_admin_user
 from messages.texts import (
@@ -44,158 +37,25 @@ db = Model()
 
 
 class ApplicationHandlers:
-    """
-    Handles the application flow and user-facing interactions.
-
-    This class manages the complete user application process including welcome
-    messages, option selection, conversation flow, and submission to admins.
-    It also handles user self-registration and provides error handling for
-    all user interactions.
-    """
-
-    async def _is_admin_user(self, bot: Any, user_id: int) -> bool:
-        """
-        Check if user is an admin of the admin group.
-
-        Args:
-            bot (Any): The bot instance.
-            user_id (int): The user ID to check.
-
-        Returns:
-            bool: True if the user is an admin, False otherwise.
-        """
-        from handlers.admin_handlers import is_admin_user
-
-        return await is_admin_user(bot, user_id)
-
-    async def _handle_telegram_errors(
-        self, operation: Callable, *args: Any, **kwargs: Any
-    ) -> Optional[Any]:
-        """
-        Centralized Telegram error handling for all operations.
-
-        Args:
-            operation (Callable): The async operation to execute.
-            *args: Positional arguments for the operation.
-            **kwargs: Keyword arguments for the operation.
-
-        Returns:
-            Optional[Any]: The result of the operation if successful, None if
-                an error occurred.
-
-        This method handles common Telegram errors like timeouts, network issues,
-        and forbidden operations gracefully.
-        """
-        try:
-            return await operation(*args, **kwargs)
-        except (TimedOut, NetworkError) as e:
-            # Handle network issues - these are usually temporary
-            print(f"Network error in user operation: {e}")
-            return None
-        except Forbidden as e:
-            # Handle blocked users or permission issues
-            print(f"Forbidden error in user operation: {e}")
-            return None
-        except BadRequest as e:
-            # Handle malformed requests (e.g., invalid chat_id, message too long)
-            print(f"Bad request in user operation: {e}")
-            return None
-        except Conflict as e:
-            # Handle conflicts (e.g., multiple bot instances)
-            print(f"Conflict in user operation: {e}")
-            return None
-        except Exception as e:
-            # Handle unexpected errors
-            print(f"Unexpected error in user operation: {e}")
-            return None
-
-    async def _safe_reply_text(
-        self, update: Update, text: str, **kwargs: Any
-    ) -> Optional[Any]:
-        """
-        Safely reply to a message with text, handling common errors.
-
-        Args:
-            update (Update): The update containing the message to reply to.
-            text (str): The text to send as a reply.
-            **kwargs: Additional keyword arguments for reply_text.
-
-        Returns:
-            Optional[Any]: The sent message if successful, None if an error occurred.
-        """
-        return await self._handle_telegram_errors(
-            update.message.reply_text, text=text, **kwargs
-        )
-
-    async def _safe_edit_message_text(
-        self, query: Any, text: str, **kwargs: Any
-    ) -> Optional[Any]:
-        """
-        Safely edit a message's text, handling common errors.
-
-        Args:
-            query (Any): The callback query containing the message to edit.
-            text (str): The new text for the message.
-            **kwargs: Additional keyword arguments for edit_message_text.
-
-        Returns:
-            Optional[Any]: The edited message if successful, None if an error occurred.
-        """
-        return await self._handle_telegram_errors(
-            query.edit_message_text, text=text, **kwargs
-        )
-
-    def _create_complete_keyboard(self) -> InlineKeyboardMarkup:
-        """
-        Create an inline keyboard with Complete and Back buttons.
-
-        Returns:
-            InlineKeyboardMarkup: A keyboard with Complete Application and Back buttons
-                for the user to complete or go back in the conversation flow.
-        """
-        return InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton(
-                        COMPLETE_BUTTON, callback_data=CALLBACK_COMPLETE
-                    )
-                ],
-                [InlineKeyboardButton(BACK_BUTTON, callback_data=CALLBACK_BACK)],
-            ]
-        )
+    """Handles the application flow (user-facing interactions)"""
 
     async def start_command(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> int:
-        """
-        Handle the /start command to begin the application process.
-
-        Args:
-            update (Update): The incoming update.
-            context (ContextTypes.DEFAULT_TYPE): The context object.
-
-        Returns:
-            int: The next conversation state (WAITING_FOR_EXPLANATION) or
-                ConversationHandler.END if the user is admin or has a pending request.
-
-        This method checks if the user is an admin (shows admin panel) or has a
-        pending request (shows pending message), otherwise starts a new application.
-        """
+        """Handle the /start command"""
         user = update.effective_user
 
         # Check if user is admin
-        is_admin = await self._is_admin_user(context.bot, user.id)
+        is_admin = await is_admin_user(context.bot, user.id)
         if is_admin:
-            await self._safe_reply_text(
-                update, ADMIN_PANEL_MESSAGE, parse_mode="Markdown"
-            )
+            await update.message.reply_text(ADMIN_PANEL_MESSAGE, parse_mode="Markdown")
             return ConversationHandler.END
 
         # Check if user already has a pending request
         existing_request = db.requests.get_by_user_id(user.id)
 
-        if existing_request and existing_request["status"] == REQUEST_STATUS_PENDING:
-            await self._safe_reply_text(update, PENDING_REQUEST_MSG)
+        if existing_request and existing_request["status"] == "pending":
+            await update.message.reply_text(PENDING_REQUEST_MSG)
             return ConversationHandler.END
 
         # Create new request
@@ -217,20 +77,8 @@ class ApplicationHandlers:
 
     async def send_welcome_message(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> Optional[Any]:
-        """
-        Send the welcome message with dynamic option buttons.
-
-        Args:
-            update (Update): The incoming update.
-            context (ContextTypes.DEFAULT_TYPE): The context object.
-
-        Returns:
-            Optional[Any]: The sent message if successful, None if an error occurred.
-
-        This method creates a dynamic keyboard based on the QUESTIONS configuration
-        and sends the welcome message with option buttons for the user to select.
-        """
+    ):
+        """Send the welcome message with dynamic options"""
         user = update.effective_user
 
         welcome_text = WELCOME_TEXT
@@ -252,25 +100,31 @@ class ApplicationHandlers:
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         if update.callback_query:
-            result = await self._safe_edit_message_text(
-                update.callback_query, text=welcome_text, reply_markup=reply_markup
-            )
-            if result is None:
-                # Try to send a simple text message without markup
-                await self._safe_edit_message_text(
-                    update.callback_query, text=welcome_text
+            try:
+                await update.callback_query.edit_message_text(
+                    text=welcome_text, reply_markup=reply_markup
                 )
-        else:
-            result = await self._safe_reply_text(
-                update, text=welcome_text, reply_markup=reply_markup
-            )
-            if result is None:
+            except (TimedOut, NetworkError):
                 # Try to send a simple text message without markup
-                await self._safe_reply_text(update, text=welcome_text)
+                try:
+                    await update.callback_query.edit_message_text(text=welcome_text)
+                except Exception:
+                    pass
+        else:
+            try:
+                await update.message.reply_text(
+                    text=welcome_text, reply_markup=reply_markup
+                )
+            except (TimedOut, NetworkError):
+                # Try to send a simple text message without markup
+                try:
+                    await update.message.reply_text(text=welcome_text)
+                except Exception:
+                    pass
 
     async def handle_option_selection(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    ):
         """Handle when user selects an option"""
         query = update.callback_query
         user = query.from_user
@@ -289,16 +143,17 @@ class ApplicationHandlers:
             # Fallback for unknown options
             question_text = FALLBACK_QUESTION
 
-        keyboard = [[InlineKeyboardButton(BACK_BUTTON, callback_data=CALLBACK_BACK)]]
+        keyboard = [[InlineKeyboardButton(BACK_BUTTON, callback_data="back")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await self._safe_edit_message_text(
-            query, text=question_text, reply_markup=reply_markup
-        )
+        try:
+            await query.edit_message_text(text=question_text, reply_markup=reply_markup)
+        except (TimedOut, NetworkError):
+            pass
 
     async def handle_back_button(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    ):
         """Handle when user clicks the Back button"""
         query = update.callback_query
         user = query.from_user
@@ -321,11 +176,18 @@ class ApplicationHandlers:
 
         # Show Complete Application button (same as after answering a follow-up)
         complete_text = complete_prompt(explanation_text)
-        reply_markup = self._create_complete_keyboard()
+        keyboard = [
+            [InlineKeyboardButton(COMPLETE_BUTTON, callback_data="complete")],
+            [InlineKeyboardButton(BACK_BUTTON, callback_data="back")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await self._safe_reply_text(
-            update, text=complete_text, reply_markup=reply_markup, parse_mode="Markdown"
-        )
+        try:
+            await update.message.reply_text(
+                text=complete_text, reply_markup=reply_markup, parse_mode="Markdown"
+            )
+        except (TimedOut, NetworkError):
+            pass
 
         return WAITING_FOR_ANSWER
 
@@ -342,11 +204,18 @@ class ApplicationHandlers:
 
         # Show Complete Application button
         complete_text = complete_prompt(answer)
-        reply_markup = self._create_complete_keyboard()
+        keyboard = [
+            [InlineKeyboardButton(COMPLETE_BUTTON, callback_data="complete")],
+            [InlineKeyboardButton(BACK_BUTTON, callback_data="back")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await self._safe_reply_text(
-            update, text=complete_text, reply_markup=reply_markup, parse_mode="Markdown"
-        )
+        try:
+            await update.message.reply_text(
+                text=complete_text, reply_markup=reply_markup, parse_mode="Markdown"
+            )
+        except (TimedOut, NetworkError):
+            pass
 
         return WAITING_FOR_ANSWER
 
@@ -378,7 +247,10 @@ class ApplicationHandlers:
         # Submit to admins
         await self.submit_to_admins(update, context, request_id, explanation)
 
-        await self._safe_edit_message_text(query, text=SUBMITTED_MSG)
+        try:
+            await query.edit_message_text(text=SUBMITTED_MSG)
+        except (TimedOut, NetworkError):
+            pass
 
         return ConversationHandler.END
 
@@ -388,7 +260,7 @@ class ApplicationHandlers:
         context: ContextTypes.DEFAULT_TYPE,
         request_id: int,
         explanation: str,
-    ) -> None:
+    ):
         """Submit application to admin chat"""
         user = update.effective_user
 
@@ -417,18 +289,20 @@ class ApplicationHandlers:
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        admin_message = await self._handle_telegram_errors(
-            context.bot.send_message,
-            chat_id=ADMIN_CHAT_ID,
-            text=admin_text,
-            reply_markup=reply_markup,
-            parse_mode="Markdown",
-        )
-        if admin_message:
-            # Store admin message ID
-            db.requests.update_status(
-                request_id, REQUEST_STATUS_PENDING, admin_message.message_id
+        try:
+            admin_message = await context.bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text=admin_text,
+                reply_markup=reply_markup,
+                parse_mode="Markdown",
             )
+            if admin_message:
+                # Store admin message ID
+                db.requests.update_status(
+                    request_id, "pending", admin_message.message_id
+                )
+        except (TimedOut, NetworkError, Forbidden):
+            pass
 
     async def cancel_application(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -436,23 +310,14 @@ class ApplicationHandlers:
         """Cancel the application process"""
         user = update.effective_user
 
-        await self._safe_reply_text(update, CANCELLED_MSG)
+        try:
+            await update.message.reply_text(CANCELLED_MSG)
+        except (TimedOut, NetworkError):
+            pass
         return ConversationHandler.END
 
-    async def add_command(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
-        """
-        Handle the /add command for user self-registration.
-
-        Args:
-            update (Update): The incoming update.
-            context (ContextTypes.DEFAULT_TYPE): The context object.
-
-        This method allows users to add themselves to the user database for
-        receiving broadcasts and being part of the community. It handles both
-        new registrations and updates to existing user information.
-        """
+    async def add_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle the /add command - add user to the user table"""
         user = update.effective_user
 
         # Add user to the users table (upsert operation)
@@ -472,10 +337,7 @@ class ApplicationHandlers:
             else:
                 message = ADD_COMMAND_SUCCESS
 
-            await self._safe_reply_text(update, message, parse_mode="Markdown")
+            await update.message.reply_text(message, parse_mode="Markdown")
 
-        except Exception as e:
-            print(f"Error in add_command: {e}")
-            await self._safe_reply_text(
-                update, ADD_COMMAND_ERROR, parse_mode="Markdown"
-            )
+        except Exception:
+            await update.message.reply_text(ADD_COMMAND_ERROR, parse_mode="Markdown")

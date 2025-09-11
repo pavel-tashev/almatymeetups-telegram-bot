@@ -17,69 +17,35 @@ from bot import TelegramBot
 
 # Global bot instance
 bot_instance = None
-bot_task = None
 
 
 async def health_check(request):
     """Health check endpoint - Render will ping this to keep instance alive"""
-    bot_status = "active" if bot_instance is not None else "inactive"
-
     return web.json_response(
         {
             "status": "healthy",
             "timestamp": datetime.now().isoformat(),
-            "bot_status": bot_status,
             "bot_active": bot_instance is not None,
         }
     )
 
 
 async def start_bot():
-    """Start the Telegram bot with conflict handling"""
-    global bot_instance, bot_task
-    max_retries = 3
-    retry_delay = 5  # seconds
+    """Start the Telegram bot"""
+    global bot_instance
+    try:
+        bot_instance = TelegramBot()
 
-    # Don't start if already running
-    if bot_instance is not None and bot_task is not None and not bot_task.done():
-        print("Bot is already running, skipping startup")
-        return
+        # Initialize the bot application properly
+        await bot_instance.application.initialize()
+        await bot_instance.application.start()
+        await bot_instance.application.updater.start_polling()
 
-    for attempt in range(max_retries):
-        try:
-            print(f"Attempting to start bot (attempt {attempt + 1}/{max_retries})")
-            bot_instance = TelegramBot()
-
-            # Initialize the bot application properly
-            await bot_instance.application.initialize()
-            await bot_instance.application.start()
-
-            print("Bot initialized successfully!")
-
-            # Start the bot in a separate task to handle conflicts gracefully
-            bot_task = asyncio.create_task(bot_instance.run())
-            return
-
-        except Exception as e:
-            print(f"Failed to start bot (attempt {attempt + 1}/{max_retries}): {e}")
-
-            # If it's a conflict error, wait longer before retrying
-            if "Conflict" in str(e) or "terminated by other getUpdates" in str(e):
-                if attempt < max_retries - 1:
-                    print(
-                        f"Conflict detected, waiting {retry_delay} seconds before retry..."
-                    )
-                    await asyncio.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
-                else:
-                    print("Max retries reached for conflict resolution")
-            else:
-                # For other errors, don't retry
-                break
-
-    print(
-        "Failed to start bot after all retries. Health check server will continue without bot."
-    )
+    except Exception as e:
+        # Log the error for debugging
+        print(f"Failed to start bot: {e}")
+        # Don't re-raise to allow the health check server to continue
+        pass
 
 
 async def init_app():
@@ -113,13 +79,6 @@ async def main():
         pass
     finally:
         # Clean up bot
-        if bot_task and not bot_task.done():
-            try:
-                bot_task.cancel()
-                await bot_task
-            except Exception:
-                pass
-
         if bot_instance:
             try:
                 await bot_instance.application.updater.stop()
