@@ -37,19 +37,27 @@ async def health_check(request):
     )
 
 
-async def start_bot():
+def start_bot():
     """Start the Telegram bot"""
     global bot_instance
     try:
         bot_instance = TelegramBot()
         logger.info("Bot instance created successfully")
 
-        # Start the bot in the background
-        asyncio.create_task(bot_instance.run())
-        logger.info("Bot started successfully")
+        # Start the bot in the background using a thread
+        import threading
+
+        bot_thread = threading.Thread(
+            target=bot_instance.application.run_polling, daemon=True
+        )
+        bot_thread.start()
+        logger.info("Bot started successfully in background thread")
 
     except Exception as e:
         logger.error(f"Failed to start bot: {e}")
+        import traceback
+
+        logger.error(f"Full traceback: {traceback.format_exc()}")
 
 
 async def init_app():
@@ -59,7 +67,7 @@ async def init_app():
     app.router.add_get("/", health_check)  # Root endpoint
 
     # Start the bot when the app starts
-    await start_bot()
+    start_bot()
 
     return app
 
