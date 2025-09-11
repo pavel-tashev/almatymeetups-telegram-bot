@@ -31,15 +31,7 @@ class AdminHandlers:
     async def approve_request(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle admin approval"""
         query = update.callback_query
-        
-        # Answer the callback query with error handling
-        try:
-            await query.answer()
-        except Exception as e:
-            # If answering fails, log but continue processing
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Failed to answer callback query: {e}")
+        await query.answer()
 
         request_id = int(query.data.split("_")[1])
 
@@ -136,15 +128,7 @@ class AdminHandlers:
     async def decline_request(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle admin rejection"""
         query = update.callback_query
-        
-        # Answer the callback query with error handling
-        try:
-            await query.answer()
-        except Exception as e:
-            # If answering fails, log but continue processing
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Failed to answer callback query: {e}")
+        await query.answer()
 
         request_id = int(query.data.split("_")[1])
 
