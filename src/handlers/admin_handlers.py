@@ -190,18 +190,22 @@ class AdminHandlers:
                 text=ERROR_DECLINE_FAILED.format(user_id=request["user_id"], error=e),
             )
 
-    async def broadcast_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def broadcast_message(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
         """Broadcast a message to all approved users (admin only)"""
         from config.settings import ADMIN_CHAT_ID
-        
+
         # Check if user is admin
         if update.effective_user.id != int(ADMIN_CHAT_ID.replace("-", "")):
-            await update.message.reply_text("❌ This command is only available to admins.")
+            await update.message.reply_text(
+                "❌ This command is only available to admins."
+            )
             return
 
         # Get the message text (everything after /broadcast)
         message_text = update.message.text.replace("/broadcast", "").strip()
-        
+
         if not message_text:
             await update.message.reply_text(
                 "❌ Please provide a message to broadcast.\n"
@@ -211,7 +215,7 @@ class AdminHandlers:
 
         # Get all active users
         users = db.get_all_active_users()
-        
+
         if not users:
             await update.message.reply_text("❌ No approved users found.")
             return
@@ -219,12 +223,11 @@ class AdminHandlers:
         # Send message to each user
         successful_sends = 0
         failed_sends = 0
-        
+
         for user in users:
             try:
                 await context.bot.send_message(
-                    chat_id=user["user_id"],
-                    text=message_text
+                    chat_id=user["user_id"], text=message_text
                 )
                 successful_sends += 1
                 # Update last contacted timestamp
@@ -242,37 +245,46 @@ class AdminHandlers:
             f"❌ Failed to send: {failed_sends}\n"
             f"👥 Total users: {len(users)}"
         )
-        
+
         await update.message.reply_text(summary, parse_mode="Markdown")
 
     async def user_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Get user statistics (admin only)"""
         from config.settings import ADMIN_CHAT_ID
-        
+
         # Check if user is admin
         if update.effective_user.id != int(ADMIN_CHAT_ID.replace("-", "")):
-            await update.message.reply_text("❌ This command is only available to admins.")
+            await update.message.reply_text(
+                "❌ This command is only available to admins."
+            )
             return
 
         # Get all active users
         users = db.get_all_active_users()
-        
+
         if not users:
-            await update.message.reply_text("📊 **User Statistics**\n\n❌ No approved users found.")
+            await update.message.reply_text(
+                "📊 **User Statistics**\n\n❌ No approved users found."
+            )
             return
 
         # Calculate statistics
         total_users = len(users)
         users_with_username = len([u for u in users if u["username"]])
         users_contacted = len([u for u in users if u["last_contacted_at"]])
-        
+
         # Get recent approvals (last 7 days)
         from datetime import datetime, timedelta
+
         week_ago = datetime.now() - timedelta(days=7)
-        recent_users = len([
-            u for u in users 
-            if u["approved_at"] and datetime.fromisoformat(u["approved_at"]) > week_ago
-        ])
+        recent_users = len(
+            [
+                u
+                for u in users
+                if u["approved_at"]
+                and datetime.fromisoformat(u["approved_at"]) > week_ago
+            ]
+        )
 
         stats_text = (
             f"📊 **User Statistics**\n\n"
@@ -282,5 +294,5 @@ class AdminHandlers:
             f"🆕 **Approved This Week:** {recent_users}\n\n"
             f"💡 Use `/broadcast <message>` to message all users"
         )
-        
+
         await update.message.reply_text(stats_text, parse_mode="Markdown")

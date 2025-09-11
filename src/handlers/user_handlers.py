@@ -345,12 +345,18 @@ class ApplicationHandlers:
 
         user = update.effective_user
 
-        # Create admin message
+        # Create admin message with Almaty timezone
+        from datetime import timedelta, timezone
+
+        # Almaty is UTC+6
+        almaty_tz = timezone(timedelta(hours=6))
+        almaty_time = datetime.now(almaty_tz)
+
         admin_text = admin_application_text(
             first_name=user.first_name,
             username=user.username,
             user_id=user.id,
-            when=datetime.now().strftime("%b %d, %Y at %I:%M %p"),
+            when=almaty_time.strftime("%b %d, %Y at %I:%M %p"),
             explanation=explanation,
         )
 
