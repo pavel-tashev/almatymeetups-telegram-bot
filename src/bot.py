@@ -103,6 +103,9 @@ class TelegramBot:
 
         # Admin stats command
         stats_handler = CommandHandler("stats", self.admin_handlers.user_stats)
+        
+        # Help command (shows different options for admin vs regular users)
+        help_handler = CommandHandler("help", self.admin_handlers.help_command)
 
         # Add a general callback handler to catch unhandled callbacks
         general_callback_handler = CallbackQueryHandler(self.handle_general_callback)
@@ -113,6 +116,7 @@ class TelegramBot:
         self.application.add_handler(decline_handler)
         self.application.add_handler(broadcast_handler)
         self.application.add_handler(stats_handler)
+        self.application.add_handler(help_handler)
         self.application.add_handler(general_callback_handler)
 
         # Set bot commands
@@ -123,7 +127,14 @@ class TelegramBot:
 
     async def set_bot_commands(self, application):
         """Set bot commands menu"""
-        commands = [BotCommand("start", COMMAND_START_DESC)]
+        from config.settings import ADMIN_CHAT_ID
+        
+        # Set different commands for admin vs regular users
+        # Note: Telegram doesn't support per-user command menus, so we'll handle this in the command handlers
+        commands = [
+            BotCommand("start", COMMAND_START_DESC),
+            BotCommand("help", "Show available commands")
+        ]
         try:
             await application.bot.set_my_commands(commands)
         except Exception:

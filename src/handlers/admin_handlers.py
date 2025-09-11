@@ -296,3 +296,29 @@ class AdminHandlers:
         )
 
         await update.message.reply_text(stats_text, parse_mode="Markdown")
+
+    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show help message with available commands"""
+        from config.settings import ADMIN_CHAT_ID
+        
+        user_id = update.effective_user.id
+        is_admin = str(user_id) == ADMIN_CHAT_ID.replace("-", "")
+        
+        if is_admin:
+            help_text = (
+                "🔧 **Admin Commands**\n\n"
+                "📊 `/stats` - View user statistics\n"
+                "📢 `/broadcast <message>` - Send message to all approved users\n"
+                "❓ `/help` - Show this help message\n\n"
+                "💡 **Note:** As an admin, you don't need to use `/start` for approval requests. "
+                "You'll receive approval requests automatically in your admin chat."
+            )
+        else:
+            help_text = (
+                "🤖 **Available Commands**\n\n"
+                "🚀 `/start` - Start the application process to join our community\n"
+                "❓ `/help` - Show this help message\n\n"
+                "💡 **Welcome to Almaty Meetups!** We're a local community of foreigners and locals in Almaty, Kazakhstan."
+            )
+        
+        await update.message.reply_text(help_text, parse_mode="Markdown")

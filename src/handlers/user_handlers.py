@@ -29,12 +29,33 @@ class ApplicationHandlers:
 
         from telegram.error import Forbidden, NetworkError, TimedOut
 
+        from config.settings import ADMIN_CHAT_ID
+
         logger = logging.getLogger(__name__)
         user = update.effective_user
 
         logger.info(
             f"START command received from user {user.id} (@{user.username}) - {user.first_name}"
         )
+
+        # Check if user is admin
+        is_admin = str(user.id) == ADMIN_CHAT_ID.replace("-", "")
+        if is_admin:
+            admin_message = (
+                "🔧 **Admin Panel**\n\n"
+                "You're logged in as an admin! Here are your available commands:\n\n"
+                "📊 `/stats` - View user statistics\n"
+                "📢 `/broadcast <message>` - Send message to all approved users\n"
+                "❓ `/help` - Show detailed help\n\n"
+                "💡 **Note:** You don't need to use `/start` for approval requests. "
+                "You'll receive approval requests automatically in your admin chat."
+            )
+            try:
+                await update.message.reply_text(admin_message, parse_mode="Markdown")
+                logger.info(f"Admin message sent to user {user.id}")
+            except (TimedOut, NetworkError, Forbidden) as e:
+                logger.error(f"Error sending admin message to user {user.id}: {e}")
+            return ConversationHandler.END
 
         # Check if user already has a pending request
         existing_request = db.get_request(user.id)
