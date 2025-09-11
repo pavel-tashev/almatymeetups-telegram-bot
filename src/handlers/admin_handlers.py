@@ -21,6 +21,16 @@ from messages.texts import (
 db = Database()
 
 
+async def is_admin_user(bot, user_id: int) -> bool:
+    """Check if user is an admin of the admin group"""
+    try:
+        chat_member = await bot.get_chat_member(ADMIN_CHAT_ID, user_id)
+        return chat_member.status in ["administrator", "creator"]
+    except Exception:
+        # If we can't check (e.g., user not in group), return False
+        return False
+
+
 class AdminHandlers:
     """Handles admin approval/rejection actions"""
 
@@ -194,10 +204,8 @@ class AdminHandlers:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
         """Broadcast a message to all approved users (admin only)"""
-        from config.settings import ADMIN_CHAT_ID
-
         # Check if user is admin
-        if update.effective_user.id != int(ADMIN_CHAT_ID.replace("-", "")):
+        if not await is_admin_user(context.bot, update.effective_user.id):
             await update.message.reply_text(
                 "❌ This command is only available to admins."
             )
@@ -250,10 +258,8 @@ class AdminHandlers:
 
     async def user_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Get user statistics (admin only)"""
-        from config.settings import ADMIN_CHAT_ID
-
         # Check if user is admin
-        if update.effective_user.id != int(ADMIN_CHAT_ID.replace("-", "")):
+        if not await is_admin_user(context.bot, update.effective_user.id):
             await update.message.reply_text(
                 "❌ This command is only available to admins."
             )
@@ -299,11 +305,9 @@ class AdminHandlers:
 
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show help message with available commands"""
-        from config.settings import ADMIN_CHAT_ID
-        
         user_id = update.effective_user.id
-        is_admin = str(user_id) == ADMIN_CHAT_ID.replace("-", "")
-        
+        is_admin = await is_admin_user(context.bot, user_id)
+
         if is_admin:
             help_text = (
                 "🔧 **Admin Commands**\n\n"
@@ -320,5 +324,5 @@ class AdminHandlers:
                 "❓ `/help` - Show this help message\n\n"
                 "💡 **Welcome to Almaty Meetups!** We're a local community of foreigners and locals in Almaty, Kazakhstan."
             )
-        
+
         await update.message.reply_text(help_text, parse_mode="Markdown")

@@ -39,7 +39,8 @@ class ApplicationHandlers:
         )
 
         # Check if user is admin
-        is_admin = str(user.id) == ADMIN_CHAT_ID.replace("-", "")
+        from handlers.admin_handlers import is_admin_user
+        is_admin = await is_admin_user(context.bot, user.id)
         if is_admin:
             admin_message = (
                 "🔧 **Admin Panel**\n\n"
