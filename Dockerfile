@@ -19,5 +19,5 @@ RUN mkdir -p /app/data
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Run the bot
-CMD ["python", "src/bot.py"]
+# Run the bot with keep-alive
+CMD ["python", "keep_alive.py"]
